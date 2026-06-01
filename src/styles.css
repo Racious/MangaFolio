@@ -1,0 +1,43 @@
+/* MangaFolio 全域樣式 —— 沉穩深色 × 金調，呼應開發文件風格。 */
+
+:root {
+  --bg: #14171c;
+  --bg-soft: #1b1f26;
+  --panel: #20252e;
+  --border: #2c333d;
+  --text: #d6dae0;
+  --text-dim: #8b94a3;
+  --accent: #c8a96a;
+  --accent-soft: #e0c896;
+  --red: #d98a8a;
+
+  font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}

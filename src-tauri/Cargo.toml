@@ -1,0 +1,40 @@
+[package]
+name = "manga-reader"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "manga_reader_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# dev 建置也採完全最佳化。
+# 影像縮放（Lanczos3）的逐像素熱迴圈在未最佳化下會慢上百倍（單張縮放
+# 540ms vs 4ms）。針對相依套件的 glob 覆寫（profile.dev.package."*"）實測
+# 無法把最佳化套進該熱迴圈，故直接拉高整個 dev profile 的最佳化等級，
+# 換得 `npm run tauri dev` 即為流暢的執行速度（代價：Rust 增量編譯稍慢）。
+[profile.dev]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+fast_image_resize = "5"
+lru = "0.12"
+
