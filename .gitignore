@@ -18,6 +18,9 @@ dist-ssr
 # 開發文件（不納入倉庫）
 漫畫閱讀器開發文件.html
 
+# CI 產生的 release 說明暫存檔
+release-body.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

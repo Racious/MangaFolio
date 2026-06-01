@@ -6,6 +6,18 @@
 
 ---
 
+## 下載
+
+至 [Releases](https://github.com/Racious/MangaFolio/releases/latest) 取得最新版本：
+
+| 類型 | 說明 |
+| --- | --- |
+| 安裝版（MSI，推薦） | Windows Installer，自動整合捷徑與解除安裝 |
+| 安裝版（NSIS） | 輕量安裝程式 |
+| 攜帶版（免安裝） | 單一 `.exe`，無需安裝，直接執行 |
+
+---
+
 ## 開發進度
 
 | 階段 | 內容 | 狀態 |
@@ -43,6 +55,19 @@ npm install
 npm run tauri dev      # 開發模式（前端 + Rust 熱重載）
 npm run tauri build    # 打包正式版
 ```
+
+### 發版（自動 release）
+
+1. 在 `CHANGELOG.md` 頂端新增 `## vX.Y.Z` 區段並寫好更新說明。
+2. 同步版本號：`npm run version:set -- X.Y.Z`（更新 package.json / tauri.conf.json / Cargo.toml）。
+3. 提交後打 tag 並推送：
+
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+4. GitHub Actions（`.github/workflows/release.yml`）自動建置並發佈 Release，附 MSI／NSIS 安裝檔、攜帶版 `.exe`，說明內容取自 `CHANGELOG.md`。
 
 ### 環境需求
 
