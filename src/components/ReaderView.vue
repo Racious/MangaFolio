@@ -14,21 +14,11 @@ function measure() {
 }
 
 // ── 一般換頁 <Transition>（推移／淡入／無；翻書改走 3D 覆蓋層）──
-const transName = computed(() => {
-  if (reader.transition === "none" || reader.transition === "book") return "";
-  if (reader.transition === "fade") return "pg-fade";
-  const dirSign = (reader.direction === "rtl" ? -1 : 1) * reader.flow;
-  return dirSign < 0 ? "pg-push-right" : "pg-push-left";
-});
-const transMode = computed<"out-in" | undefined>(() => {
-  const t = transName.value;
-  return t === "pg-push-right" || t === "pg-push-left" ? undefined : "out-in";
-});
-
 // ── 3D 翻書 ──
 interface FlipState {
   single: boolean;
-  side: "left" | "right"; // 翻動頁繞哪一側書脊（單／雙頁皆用）
+  side: "left" | "right"; // 雙頁：翻動的是哪一頁
+  spin?: string; // 單頁：旋轉類別（書脊固定在裝訂側）
   front: string;
   back: string;
   reveal: string;
@@ -39,13 +29,15 @@ const flip = ref<FlipState | null>(null);
 const flipTurned = ref(false);
 let pendingTarget = 0;
 
-const useBookFlip = computed(() => reader.transition === "book" && reader.hasBook);
-// 翻書（動畫由 3D 覆蓋層負責）與「無」都直接就位、不經 <Transition>，避免閃爍。
-const instantStage = computed(() => useBookFlip.value || reader.transition === "none");
+// 僅「雙頁＋翻書」有翻頁動畫（3D 覆蓋層）；單頁與「無」皆即時換頁。
+const useBookFlip = computed(
+  () => reader.transition === "book" && reader.pageMode === "double" && reader.hasBook
+);
 
 async function turn(forward: boolean) {
   if (!reader.hasBook || flip.value) return;
-  if (reader.transition !== "book") {
+  // 僅「雙頁＋翻書」有翻頁動畫；單頁與「無」即時換頁。
+  if (!useBookFlip.value) {
     forward ? reader.next() : reader.prev();
     return;
   }
@@ -55,17 +47,15 @@ async function turn(forward: boolean) {
 
   const curView = reader.viewIndices;
   const nextView = reader.indicesForStart(target);
-  // 跨頁頁數不同（如封面單頁↔雙頁）時，翻書動畫不適用，退化為即時換頁。
-  if (curView.length !== nextView.length) {
+  // 僅完整雙頁跨頁才翻書動畫；封面單頁／末尾單頁等退化為即時換頁。
+  if (curView.length !== 2 || nextView.length !== 2) {
     forward ? reader.next() : reader.prev();
     return;
   }
 
   // 右開：下一頁往右翻（左頁繞書脊往右）、上一頁往左翻（右頁往左）。左開相反。
-  // side='left' 表「左頁往右翻」；side='right' 表「右頁往左翻」。
   const rtl = reader.direction === "rtl";
-  const flipsRight = forward === rtl;
-  const side: "left" | "right" = flipsRight ? "left" : "right";
+  const side: "left" | "right" = forward === rtl ? "left" : "right";
 
   let urls: string[];
   try {
@@ -75,31 +65,22 @@ async function turn(forward: boolean) {
     return;
   }
 
+  const curLeft = reader.slots[0]?.url;
+  const curRight = reader.slots[1]?.url ?? curLeft;
+  if (!curLeft || !curRight) {
+    forward ? reader.next() : reader.prev();
+    return;
+  }
   // 目標跨頁的顯示左／右頁（依閱讀方向，與 store 排版一致）。
   const targetRight = rtl ? urls[0] : urls[1] ?? urls[0];
   const targetLeft = rtl ? urls[1] ?? urls[0] : urls[0];
 
-  if (curView.length === 2) {
-    const curLeft = reader.slots[0]?.url;
-    const curRight = reader.slots[1]?.url ?? curLeft;
-    if (!curLeft || !curRight) {
-      forward ? reader.next() : reader.prev();
-      return;
-    }
-    flip.value =
-      side === "left"
-        ? // 左頁往右翻：正面=當前左頁，背面=目標右頁，露出目標左頁，右側不動
-          { single: false, side: "left", front: curLeft, back: targetRight, reveal: targetLeft, staticUrl: curRight, urls }
-        : // 右頁往左翻：正面=當前右頁，背面=目標左頁，露出目標右頁，左側不動
-          { single: false, side: "right", front: curRight, back: targetLeft, reveal: targetRight, staticUrl: curLeft, urls };
-  } else {
-    const curPage = reader.slots[0]?.url;
-    if (!curPage) {
-      forward ? reader.next() : reader.prev();
-      return;
-    }
-    flip.value = { single: true, side, front: curPage, back: urls[0], reveal: urls[0], urls };
-  }
+  flip.value =
+    side === "left"
+      ? // 左頁往右翻：正面=當前左頁，背面=目標右頁，露出目標左頁，右側不動
+        { single: false, side: "left", front: curLeft, back: targetRight, reveal: targetLeft, staticUrl: curRight, urls }
+      : // 右頁往左翻：正面=當前右頁，背面=目標左頁，露出目標右頁，左側不動
+        { single: false, side: "right", front: curRight, back: targetLeft, reveal: targetRight, staticUrl: curLeft, urls };
 
   flipTurned.value = false;
   pendingTarget = target;
@@ -119,7 +100,8 @@ function onClick(e: MouseEvent) {
   if (!el) return;
   const rect = el.getBoundingClientRect();
   const leftHalf = e.clientX - rect.left < rect.width / 2;
-  const advance = reader.direction === "rtl" ? leftHalf : !leftHalf;
+  // 右開：右半=下一頁；左開：左半=下一頁。
+  const advance = reader.direction === "rtl" ? !leftHalf : leftHalf;
   turn(advance);
 }
 
@@ -129,10 +111,12 @@ function onKey(e: KeyboardEvent) {
   const stepPx = el ? Math.max(80, el.clientHeight * 0.85) : 80;
   switch (e.key) {
     case "ArrowLeft":
-      reader.direction === "rtl" ? turn(true) : turn(false);
+      // 右開：左=上一頁；左開：左=下一頁。
+      reader.direction === "rtl" ? turn(false) : turn(true);
       break;
     case "ArrowRight":
-      reader.direction === "rtl" ? turn(false) : turn(true);
+      // 右開：右=下一頁；左開：右=上一頁。
+      reader.direction === "rtl" ? turn(true) : turn(false);
       break;
     case "ArrowUp":
       el?.scrollBy({ top: -stepPx });
@@ -187,30 +171,21 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="scroll" :class="{ fit: reader.zoom === 'window' }" ref="scroller" @click="onClick">
-      <!-- 翻書／無：版面直接就位（翻書動畫由 3D 覆蓋層負責），不經 <Transition> -->
-      <div v-if="instantStage" class="stage">
+      <!-- 版面直接就位；翻書動畫由 3D 覆蓋層負責，其餘即時換頁 -->
+      <div class="stage">
         <img v-for="slot in reader.slots" :key="slot.index" :src="slot.url" class="page" draggable="false" />
       </div>
-      <!-- 其餘特效 -->
-      <Transition v-else :name="transName" :mode="transMode">
-        <div class="stage" :key="reader.viewSeq">
-          <img v-for="slot in reader.slots" :key="slot.index" :src="slot.url" class="page" draggable="false" />
-        </div>
-      </Transition>
     </div>
 
     <!-- 3D 翻書覆蓋層 -->
     <div v-if="flip" class="flip-overlay">
       <div class="flip-stage" :class="{ turned: flipTurned }">
-        <!-- 單頁：繞中央軸翻轉 -->
+        <!-- 單頁：朝裝訂側基準線收攏（弱透視，偏收縮非擺盪） -->
         <template v-if="flip.single">
-          <div class="half flip-half">
+          <div class="half flip-half single-half">
+            <img class="sizer" :src="flip.front" draggable="false" />
             <img class="reveal" :src="flip.reveal" draggable="false" />
-            <div
-              class="sheet"
-              :class="flip.side === 'right' ? 'sheet-right' : 'sheet-left'"
-              @transitionend="onFlipEnd"
-            >
+            <div class="sheet" :class="flip.spin" @transitionend="onFlipEnd">
               <img class="face front" :src="flip.front" draggable="false" />
               <img class="face back" :src="flip.back" draggable="false" />
             </div>
@@ -279,34 +254,6 @@ onUnmounted(() => {
   display: block;
 }
 
-/* ── 整頁推移（推移特效）── */
-.pg-push-right-leave-active,
-.pg-push-left-leave-active {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  z-index: 3;
-  transition: transform 0.2s ease-out;
-}
-.pg-push-right-leave-to {
-  transform: translateX(100%);
-}
-.pg-push-left-leave-to {
-  transform: translateX(-100%);
-}
-.pg-push-right-enter-active,
-.pg-push-left-enter-active {
-  transition: none;
-}
-.pg-fade-enter-active,
-.pg-fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.pg-fade-enter-from,
-.pg-fade-leave-to {
-  opacity: 0;
-}
-
 /* ── 3D 翻書覆蓋層 ── */
 .flip-overlay {
   position: absolute;
@@ -324,6 +271,10 @@ onUnmounted(() => {
 .flip-stage .half {
   position: relative;
   perspective: 2200px;
+}
+/* 單頁：弱透視，使翻頁偏「朝基準線等比收攏」而非門板擺盪 */
+.flip-stage .half.single-half {
+  perspective: 5200px;
 }
 /* 含翻動頁的那一半需疊在另一半之上，否則翻動頁會被另一半的靜止頁遮住
    （perspective 使每個 .half 成為獨立堆疊脈絡，故須顯式拉高 z-index）。 */
@@ -362,12 +313,30 @@ onUnmounted(() => {
 .sheet-left {
   transform-origin: right center;
 }
+/* 單頁：書脊固定於右緣（sr）或左緣（sl）；翻動方向決定正負旋轉。 */
+.sr-pos,
+.sr-neg {
+  transform-origin: right center;
+}
+.sl-pos,
+.sl-neg {
+  transform-origin: left center;
+}
 /* 注意：切勿在此加 filter/opacity——會使 preserve-3d 扁平化，背面隱藏失效。 */
 .flip-stage.turned .sheet-right {
   transform: rotateY(-180deg);
 }
 .flip-stage.turned .sheet-left {
   transform: rotateY(180deg);
+}
+/* 單頁只翻到直角（90°）即露出下一頁，無需翻滿 180°。 */
+.flip-stage.turned .sr-pos,
+.flip-stage.turned .sl-pos {
+  transform: rotateY(90deg);
+}
+.flip-stage.turned .sr-neg,
+.flip-stage.turned .sl-neg {
+  transform: rotateY(-90deg);
 }
 .face {
   position: absolute;

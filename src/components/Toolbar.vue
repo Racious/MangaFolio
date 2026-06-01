@@ -14,8 +14,6 @@ const ZOOMS: { value: FitMode; label: string }[] = [
 
 const TRANSITIONS: { value: Transition; label: string }[] = [
   { value: "book", label: "翻頁：翻書" },
-  { value: "slide", label: "翻頁：推移" },
-  { value: "fade", label: "翻頁：淡入" },
   { value: "none", label: "翻頁：無" },
 ];
 

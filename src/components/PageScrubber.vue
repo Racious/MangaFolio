@@ -27,7 +27,6 @@ function onInput(e: Event) {
     <span class="names" :title="namesText">{{ namesText }}</span>
     <input
       class="range"
-      :class="{ rtl: reader.direction === 'rtl' }"
       type="range"
       min="0"
       :max="Math.max(0, reader.pageCount - 1)"
@@ -75,9 +74,6 @@ function onInput(e: Event) {
   border-radius: 3px;
   outline: none;
   cursor: pointer;
-}
-.range.rtl {
-  direction: rtl;
 }
 .range::-webkit-slider-thumb {
   -webkit-appearance: none;
