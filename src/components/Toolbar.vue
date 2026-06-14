@@ -102,9 +102,9 @@ function bumpScale(delta: number) {
       <span class="sep"></span>
 
       <div class="pager" v-if="reader.hasBook">
-        <button class="btn ghost sq" :disabled="reader.atFirst" @click="reader.prev()">‹</button>
+        <button class="btn ghost sq" @click="reader.prev()">‹</button>
         <span class="counter">{{ reader.index + 1 }} / {{ reader.pageCount }}</span>
-        <button class="btn ghost sq" :disabled="reader.atLast" @click="reader.next()">›</button>
+        <button class="btn ghost sq" @click="reader.next()">›</button>
       </div>
     </div>
   </header>

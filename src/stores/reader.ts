@@ -173,12 +173,16 @@ export const useReaderStore = defineStore("reader", {
     },
 
     next() {
+      if (!this.hasBook) return;
       const n = this.nextStart();
-      if (n >= 0) return this.goto(n);
+      // 迴圈：已在最後 → 回到第一頁。
+      return this.goto(n >= 0 ? n : 0);
     },
     prev() {
+      if (!this.hasBook) return;
       const p = this.prevStart();
-      if (p >= 0) return this.goto(p);
+      // 迴圈：已在第一頁 → 跳到最後一個跨頁。
+      return this.goto(p >= 0 ? p : this.pairStart(this.pages.length - 1));
     },
 
     setViewport(w: number, h: number) {

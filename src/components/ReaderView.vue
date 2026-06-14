@@ -37,13 +37,18 @@ const useBookFlip = computed(
 async function turn(forward: boolean) {
   if (!reader.hasBook || flip.value) return;
   // 僅「雙頁＋翻書」有翻頁動畫；單頁與「無」即時換頁。
+  // 捲軸歸零交由 watch(reader.index, flush:'post') 在新頁換好後、繪製前統一處理。
   if (!useBookFlip.value) {
     forward ? reader.next() : reader.prev();
     return;
   }
 
   const target = forward ? reader.nextStart() : reader.prevStart();
-  if (target < 0) return; // 已到邊界
+  if (target < 0) {
+    // 邊界迴圈：以即時換頁繞回另一端（不跨端做翻書動畫，避免突兀）。
+    forward ? reader.next() : reader.prev();
+    return;
+  }
 
   const curView = reader.viewIndices;
   const nextView = reader.indicesForStart(target);
@@ -108,7 +113,8 @@ function onClick(e: MouseEvent) {
 function onKey(e: KeyboardEvent) {
   if (!reader.hasBook) return;
   const el = scroller.value;
-  const stepPx = el ? Math.max(80, el.clientHeight * 0.85) : 80;
+  // 單次捲動約視窗高 0.7（幅度大但靠 smooth 平滑滑行，非瞬間跳動）。
+  const stepPx = el ? Math.max(160, el.clientHeight * 0.7) : 160;
   switch (e.key) {
     case "ArrowLeft":
       // 右開：左=上一頁；左開：左=下一頁。
@@ -119,10 +125,10 @@ function onKey(e: KeyboardEvent) {
       reader.direction === "rtl" ? turn(true) : turn(false);
       break;
     case "ArrowUp":
-      el?.scrollBy({ top: -stepPx });
+      el?.scrollBy({ top: -stepPx, behavior: "smooth" });
       break;
     case "ArrowDown":
-      el?.scrollBy({ top: stepPx });
+      el?.scrollBy({ top: stepPx, behavior: "smooth" });
       break;
     case "PageUp":
       turn(false);
@@ -143,11 +149,14 @@ function onKey(e: KeyboardEvent) {
   e.preventDefault();
 }
 
+// flush:'post' → 在新頁 DOM 更新後、瀏覽器繪製前歸零捲軸，
+// 避免「舊高圖先彈回頂端」或「新頁先停在舊捲動位置」的兩段式跳動。
 watch(
   () => reader.index,
   () => {
     if (scroller.value) scroller.value.scrollTop = 0;
-  }
+  },
+  { flush: "post" }
 );
 
 onMounted(() => {
@@ -240,6 +249,8 @@ onUnmounted(() => {
   overflow: auto;
   display: flex;
   cursor: pointer;
+  /* 關閉捲動錨定：換頁時新圖高度不同，避免瀏覽器為「維持視覺位置」而跳動造成兩段式 */
+  overflow-anchor: none;
 }
 /* 配合視窗模式內容必填滿、不需捲動：關閉捲軸，避免捲軸寬度造成置中位移與翻頁閃爍 */
 .scroll.fit {
