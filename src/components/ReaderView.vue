@@ -149,11 +149,17 @@ function onKey(e: KeyboardEvent) {
   e.preventDefault();
 }
 
-// flush:'post' → 在新頁 DOM 更新後、瀏覽器繪製前歸零捲軸，
-// 避免「舊高圖先彈回頂端」或「新頁先停在舊捲動位置」的兩段式跳動。
+// 捲軸歸零：監聽 viewSeq（新頁 slots 換好後才遞增），而非 index（頁碼一改即觸發、但新圖尚未抓回）。
+// flush:'post' → 在新頁 DOM 更新後、瀏覽器繪製前歸零捲軸；配合 viewSeq，舊頁在抓圖期間維持不動，
+// 新圖就位後於同一幀歸零並繪出，消除「舊高圖先急速上滑再換頁」的兩段式抖動。
+// 惟 viewSeq 亦會因縮放（setZoom）或視窗尺寸變動（ResizeObserver→setViewport→render）而遞增，
+// 故以 lastScrollIndex 比對頁碼：僅「真正換頁」（index 改變）才歸頂；resize／縮放重繪一律保留當前閱讀位置。
+let lastScrollIndex = -1;
 watch(
-  () => reader.index,
+  () => reader.viewSeq,
   () => {
+    if (reader.index === lastScrollIndex) return; // resize／縮放重繪：非換頁，保留位置
+    lastScrollIndex = reader.index;
     if (scroller.value) scroller.value.scrollTop = 0;
   },
   { flush: "post" }

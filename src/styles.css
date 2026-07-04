@@ -34,10 +34,19 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-soft);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 5px;
+  /* 明顯灰調，與深背景拉開對比，清楚呈現當前捲動位置；3px 同軌道色邊框使 thumb 內縮、圓潤 */
+  background: var(--text-dim);
+  border-radius: 6px;
+  border: 3px solid var(--bg-soft);
+}
+::-webkit-scrollbar-thumb:hover {
+  /* 拖曳時轉金調，回饋當前操作 */
+  background: var(--accent);
 }
