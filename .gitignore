@@ -31,3 +31,12 @@ release-body.md
 *.njsproj
 *.sln
 *.sw?
+
+# AMAGI Core 派生物（受管副本/工作區，不進版控）
+.amagi/
+.codex/skills/
+.claude/skills/
+
+# Updater 簽章金鑰（私鑰與密碼絕不可進版控；公鑰 .pub 可以）
+src-tauri/updater-keys/*.key
+src-tauri/updater-keys/*.password.txt

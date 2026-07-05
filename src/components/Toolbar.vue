@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useReaderStore, type Transition } from "../stores/reader";
+import { useUpdateStore } from "../stores/update";
 import { pickFolder, pickFile, type FitMode } from "../api/backend";
 
 const reader = useReaderStore();
+const update = useUpdateStore();
 
 const ZOOMS: { value: FitMode; label: string }[] = [
   { value: "window", label: "配合視窗" },
@@ -106,6 +108,22 @@ function bumpScale(delta: number) {
         <span class="counter">{{ reader.index + 1 }} / {{ reader.pageCount }}</span>
         <button class="btn ghost sq" @click="reader.next()">›</button>
       </div>
+
+      <span class="sep"></span>
+
+      <!-- 手動檢查更新（開機亦會靜默背景檢查）。發現新版由 UpdateDialog 彈窗；
+           若已是最新版，僅在此顯示簡短提示，不打斷閱讀。 -->
+      <button
+        class="btn ghost"
+        :disabled="update.checking"
+        @click="update.checkForUpdates()"
+        title="檢查是否有新版本"
+      >
+        {{ update.checking ? "檢查中…" : "檢查更新" }}
+      </button>
+      <span v-if="update.statusMessage && !update.updateAvailable" class="update-hint">
+        {{ update.statusMessage }}
+      </span>
     </div>
   </header>
 </template>
@@ -190,6 +208,11 @@ function bumpScale(delta: number) {
   width: 1px;
   height: 20px;
   background: var(--border);
+}
+.update-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 .pager {
   display: flex;

@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { onMounted } from "vue";
 import Toolbar from "./components/Toolbar.vue";
 import ReaderView from "./components/ReaderView.vue";
 import PageScrubber from "./components/PageScrubber.vue";
+import UpdateDialog from "./components/UpdateDialog.vue";
 import { useReaderStore } from "./stores/reader";
+import { useUpdateStore } from "./stores/update";
 
 // 鍵盤導航與捲動由 ReaderView 處理（其持有捲動容器參照）。
 const reader = useReaderStore();
+const update = useUpdateStore();
+
+// 開機背景靜默檢查更新；發現新版由 UpdateDialog 呈現，失敗不打擾。
+onMounted(() => {
+  update.checkForUpdates({ silent: true });
+});
 </script>
 
 <template>
@@ -14,6 +23,7 @@ const reader = useReaderStore();
     <ReaderView />
     <PageScrubber />
     <p v-if="reader.error" class="error-bar">{{ reader.error }}</p>
+    <UpdateDialog />
   </div>
 </template>
 
