@@ -48,10 +48,23 @@
 
 ---
 
+## 書庫開發版
+
+此分支新增本機書庫首頁、封面、書名搜尋、整本收藏、最近閱讀與自動續讀。
+
+- **加入書籍**：首頁可多選 ZIP／CBZ，或加入直接包含圖片的資料夾；原始檔案留在原位。重複加入同一來源會更新資料，不會清除收藏與進度。
+- **閱讀與收藏**：點封面開始閱讀，點星號收藏；「我的收藏」「最近閱讀」可搭配書名搜尋。搜尋支援大小寫與全形／半形正規化。
+- **自動續讀**：每本書保存頁面名稱、頁碼、方向、單雙頁、縮放及翻頁偏好。返回書庫、切書與正常關閉視窗前會補存；儲存失敗時顯示錯誤並保留閱讀視窗供重試。
+- **本機資料**：Rust 使用 bundled SQLite，不需另外安裝資料庫。`library.sqlite3` 與 `covers/` 位於 Tauri 的應用資料目錄（identifier 為 `com.racious.mangafolio`）。備份前先關閉程式；程式開啟時 SQLite 可能還有 WAL 資料。
+- **目前範圍**：這是手動加入來源的本機書庫，尚未提供遞迴掃描漫畫根目錄、檔案搬移後重新定位、頁面書籤、OCR 或雲端同步。來源暫時不存在時會保留書籍資料、收藏與進度；重新接回原路徑後可恢復使用。
+
 ## 開發
 
 ```bash
-npm install
+npm ci
+npm test              # 書名搜尋、篩選與排序
+npm run build         # TypeScript 與前端建置
+cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri dev      # 開發模式（前端 + Rust 熱重載）
 npm run tauri build    # 打包正式版
 ```

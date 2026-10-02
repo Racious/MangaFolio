@@ -3,9 +3,11 @@ mod book;
 mod cache;
 mod commands;
 mod image_pipeline;
+mod library;
 mod sorting;
 
 use commands::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,9 +17,21 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .setup(|app| {
+            let directory = app.path().app_data_dir()?;
+            let library = library::Library::open(&directory).map_err(std::io::Error::other)?;
+            app.manage(library);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::open_path,
-            commands::render_page
+            commands::render_page,
+            commands::open_library_book,
+            library::list_library,
+            library::import_book,
+            library::set_favorite,
+            library::save_reading_progress,
+            library::library_cover
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

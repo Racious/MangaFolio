@@ -28,6 +28,7 @@ function onInput(e: Event) {
     <input
       class="range"
       type="range"
+      aria-label="閱讀頁碼"
       min="0"
       :max="Math.max(0, reader.pageCount - 1)"
       :value="reader.index"
