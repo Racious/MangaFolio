@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import BookCard from "./BookCard.vue";
+import LibraryGuide from "./LibraryGuide.vue";
 import { useLibraryStore, type LibraryFilter } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 import { pickBookFiles } from "../api/library";
@@ -10,6 +11,7 @@ import { pickFolder } from "../api/backend";
 const library = useLibraryStore();
 const reader = useReaderStore();
 const limit = ref(60);
+const guideTarget = ref("");
 const sort = ref<"recent" | "title">("recent");
 const filters: { id: LibraryFilter; label: string }[] = [
   { id: "all", label: "全部書籍" },
@@ -53,7 +55,10 @@ async function openBook(id: number) {
         <h1>你的漫畫書庫</h1>
         <p>收藏好故事，隨時接著讀。</p>
       </div>
-      <div class="import-actions">
+      <div
+        class="import-actions"
+        :class="{ 'guide-highlight': guideTarget === 'import' }"
+      >
         <button
           class="primary"
           :disabled="library.importing || reader.loading"
@@ -76,6 +81,7 @@ async function openBook(id: number) {
         </button>
       </div>
     </header>
+    <LibraryGuide @highlight="guideTarget = $event" />
     <p v-if="library.error" class="notice error" role="alert">
       {{ library.error }}
       <button :disabled="library.loading" @click="library.refresh">
@@ -95,6 +101,7 @@ async function openBook(id: number) {
         !library.query.trim()
       "
       class="continue-panel"
+      :class="{ 'guide-highlight': guideTarget === 'recent' }"
       aria-labelledby="continue-title"
     >
       <div>
@@ -119,6 +126,10 @@ async function openBook(id: number) {
           v-for="filter in filters"
           :key="filter.id"
           :class="{ active: library.filter === filter.id }"
+          :data-guide-highlight="
+            (guideTarget === 'favorites' && filter.id === 'favorites') ||
+            (guideTarget === 'recent' && filter.id === 'recent')
+          "
           :aria-pressed="library.filter === filter.id"
           @click="library.filter = filter.id"
         >
@@ -132,7 +143,10 @@ async function openBook(id: number) {
           }}</span>
         </button>
       </nav>
-      <div class="search-controls">
+      <div
+        class="search-controls"
+        :class="{ 'guide-highlight': guideTarget === 'search' }"
+      >
         <label class="search"
           ><span aria-hidden="true">⌕</span
           ><input
@@ -150,6 +164,7 @@ async function openBook(id: number) {
     <section
       v-else-if="!library.books.length"
       class="empty"
+      :class="{ 'guide-highlight': guideTarget === 'books' }"
       aria-labelledby="empty-title"
     >
       <div aria-hidden="true">漫</div>
@@ -186,7 +201,14 @@ async function openBook(id: number) {
       ><p class="results" aria-live="polite">
         {{ sortedBooks.length }} 本書{{ reader.loading ? " · 正在開啟…" : "" }}
       </p>
-      <section class="book-grid" aria-label="書籍">
+      <section
+        class="book-grid"
+        :class="{
+          'guide-highlight':
+            guideTarget === 'books' || guideTarget === 'favorites',
+        }"
+        aria-label="書籍"
+      >
         <BookCard
           v-for="book in shownBooks"
           :key="`${book.id}:${library.revision}`"
@@ -210,6 +232,12 @@ async function openBook(id: number) {
 </template>
 
 <style scoped>
+.guide-highlight,
+[data-guide-highlight="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
 .library-view {
   flex: 1;
   min-height: 0;
