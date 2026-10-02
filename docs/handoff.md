@@ -1,0 +1,83 @@
+# 書庫功能開發交接
+
+更新日期：2026-10-02（UTC）。範圍：本機書庫、收藏、搜尋、續讀與教學引導。
+
+## 目前狀態
+
+| 項目 | 狀態 |
+| --- | --- |
+| Repository | `Racious/MangaFolio` |
+| 開發分支 | `feature/library-favorites-resume`，已推送 GitHub |
+| 核心功能提交 | `06469a6`：本機書庫、收藏、搜尋與續讀 |
+| 教學功能提交 | `7fe4acb`：五步教學與附截圖文件 |
+| 程式版本 | 仍為 `0.1.4`，未新增發版 tag |
+| 整合與發版 | 本次工作未合併 main、未建立 PR、未發布新安裝包 |
+| 審查 | 已自我檢查與測試；尚未完成獨立 Code Review、安全審查 |
+
+這是可試用的開發版。測試通過不代表完成正式審核或商業發版驗收。GitHub Releases 的既有安裝包尚未包含此分支功能。
+
+## 已完成與範圍限制
+
+- 首頁封面書庫，可加入多本 ZIP／CBZ，或直接包含圖片的資料夾。
+- 整本收藏、最近閱讀、部分書名搜尋、自然書名排序；搜尋支援大小寫與全形／半形正規化。
+- 自動續讀，保留頁面名稱、頁碼及每本書的閱讀設定；來源消失時保留收藏與進度。
+- 切書、返回書庫與正常關閉前等待儲存；失敗時顯示錯誤，正常關閉會保留視窗供重試。
+- 跨書籍 session 隔離、延遲封面載入、小視窗工具列改善。
+- 可收合的五步教學、對應區域框線、步驟與收合狀態記憶。
+
+尚未提供：遞迴掃描根目錄、刪除書庫項目、來源搬移後重新定位、頁面書籤、作者／標籤管理、全文搜尋、雲端同步。搜尋只針對已加入書庫的書名；收藏是整本收藏。
+
+## 取得、執行與檢查
+
+保存本地未提交修改後，依 [新功能教學](library-guide.md#取得與啟動) 取得分支。工具需求：Node.js 22、Rust 1.95.0，以及 Tauri 2 的平台系統依賴。Windows 需 C++ Build Tools 與 WebView2；Linux 需 GTK／WebKitGTK 等依賴。
+
+```bash
+npm ci
+npm run tauri dev
+```
+
+`npm run dev` 只啟動前端；書庫與閱讀需要原生 Tauri IPC，不能用一般瀏覽器取代完整桌面實測。驗證命令與驗收清單見 [驗證紀錄](validation.md)。
+
+## 架構與修改入口
+
+| 檔案 | 職責與接手注意事項 |
+| --- | --- |
+| `src-tauri/src/library.rs` | SQLite schema v1、來源去重、收藏、進度、封面與書庫 IPC。資料庫較新的 schema 會拒絕開啟，不會重設資料。 |
+| `src-tauri/src/book.rs` | 書籍來源路徑與格式，資料夾及 ZIP／CBZ 頁面來源。 |
+| `src-tauri/src/commands.rs` | 開啟來源、還原進度、session ID、算繪及預載快取隔離。新增書籍切換流程時需保留 session 檢查。 |
+| `src-tauri/src/lib.rs` | 以 Tauri app_data_dir 初始化書庫並註冊指令。 |
+| `src/api/library.ts`、`src/api/covers.ts` | IPC 型別與延遲封面佇列；可見封面最多兩個工作並行。 |
+| `src/stores/library.ts`、`src/lib/library.ts` | 書庫畫面狀態、加入、收藏、篩選與排序。 |
+| `src/stores/reader.ts`、`src/App.vue` | 400ms 延遲儲存、序列化儲存、切書／回書庫／關閉前補存。教學以外的進度錯誤不可直接忽略。 |
+| `src/components/LibraryView.vue`、`BookCard.vue` | 書庫介面、封面、收藏與操作入口。封面卸載時釋放 blob URL。 |
+| `src/components/LibraryGuide.vue` | 五步教學與 localStorage 設定；儲存不可用時仍可操作教學。 |
+| `src-tauri/capabilities/default.json` | 主視窗新增 allow-destroy，以便等待進度儲存後關閉。 |
+
+新增依賴只有 Rust `rusqlite`（bundled SQLite），不需另外安裝資料庫；前端教學未新增 npm 依賴。
+
+## 資料、備份與相容性
+
+- `library.sqlite3` 及 `covers/` 存於 Tauri 的應用資料目錄，identifier 為 `com.racious.mangafolio`。由 `app_data_dir()` 解析實際路徑，請勿硬編碼雲端測試路徑。
+- SQLite 使用 WAL。手動備份前正常關閉所有程式實例；執行中只複製主資料庫檔可能遺漏尚未 checkpoint 的資料。要在線備份應使用 SQLite backup API。
+- 書籍保存 canonical 來源路徑；漫畫不會搬入應用資料目錄。備份 SQLite 不等於備份漫畫本體。
+- 重複加入同一路徑會更新資料並保留 ID、收藏與進度；單純加入不會標為已閱讀。
+- 續讀優先比對頁面名稱；頁面找不到時使用範圍內的保存頁碼。
+- 教學狀態位於 WebView localStorage：`mangafolio.library-guide.v1.hidden`、`mangafolio.library-guide.v1.step`，不在 SQLite。可用「開始教學」重看，不需清空書庫。
+- 未提供可逆 schema 遷移方案。未來改 schema 前，先定義升級與復原流程；回退程式時保留資料備份，不要刪除資料庫來繞過版本檢查。
+
+## 雲端環境交接
+
+本次雲端使用 `/workspace/MangaFolio`。Node／Rust、Linux 系統依賴與工具設定在 checkout 外的 `/workspace/.mangafolio-tools/`，不會隨 Git clone 帶到本地。
+
+保留此雲端工作區時，可在 shell 執行 `. /workspace/.mangafolio-tools/env.sh` 啟用工具；該目錄的 `start.md` 記錄無實體螢幕的桌面啟動、Xvfb、PRoot 與 WebKit helper 的處理方式。這些是此環境的專用設定，不是一般本地啟動需求。先前已保存 onboarding 設定草稿；本次文件整理未變更或確認其發布狀態。
+
+曾遇到環境離線及 `exec-server protocol error`，導致短暫無法取檔／推送。連線恢復後確認原提交仍在，並成功推送、讀回遠端 hash。問題出在雲端連線，未將其判定為產品缺陷。原始 Rust 測試日誌與額外實測截圖仍在 `/workspace/MangaFolio-review/`；Git 中保留的是整理後的紀錄與選用截圖。
+
+## 下一位接手者的優先事項
+
+1. 先做獨立 Code Review：進度儲存順序、關閉處理、session 隔離、SQLite 版本與錯誤處理。
+2. 在 Windows 重驗教學、加入、收藏、切書、立即關閉及重啟續讀；再驗 MSI／NSIS、安裝／解除安裝及升級。
+3. 發版前完成安全審查；目前配置的 CSP 為 null，應評估桌面權限、來源內容與更新流程，這項配置事實尚不構成已驗證漏洞。
+4. 規劃管理功能：移除書庫項目但保留漫畫、重新指定來源、批次加入及標籤；先定義資料與使用流程再開發。
+
+本次未建立新 PR。準備合併時，以 [驗證紀錄](validation.md) 為驗收依據，透過 PR 審查。正式發版再依主 README 的版本同步、tag、release 工作流程執行；不要把分支推送當成安裝包發布。

@@ -4,6 +4,8 @@
 
 技術棧：**Tauri 2 + Rust 後端 + Vue 3 (TypeScript) 前端**。
 
+文件入口：[文件索引](docs/README.md) · [新功能教學](docs/library-guide.md) · [開發交接](docs/handoff.md) · [驗證紀錄](docs/validation.md) · [工作日誌](docs/work-log.md)。
+
 ---
 
 ## 下載
@@ -24,7 +26,7 @@
 | --- | --- | --- |
 | **P1 — 基礎** | 開啟資料夾／ZIP／CBZ、自然排序、單頁顯示、左右翻頁 | ✅ 完成 |
 | **P2 — 閱讀核心** | 雙頁、左／右開、縮放模式、Lanczos3 縮放管線 | ✅ 完成 |
-| P3 — 體驗 | 快捷鍵、預載快取、縮圖列、進度記憶 | 規劃中 |
+| P3 — 體驗 | 快捷鍵、預載快取、書庫、收藏、搜尋、續讀、教學引導 | 功能分支已實作；縮圖列待開發，尚待獨立審查與 Windows 驗收 |
 | P4 — 格式擴增 | RAR / CBR、7z | 規劃中 |
 
 ### P1 已實作功能
@@ -102,15 +104,20 @@ npm run tauri build    # 打包正式版
 src/                      # Vue 3 前端
 ├─ components/
 │  ├─ ReaderView.vue      # 閱讀區（單／雙頁、3D 翻書特效、點擊／鍵盤導航）
+│  ├─ LibraryView.vue     # 書庫、搜尋、收藏與續讀入口
+│  ├─ LibraryGuide.vue    # 五步教學與操作區域提示
+│  ├─ BookCard.vue        # 延遲封面、收藏與進度卡片
 │  ├─ Toolbar.vue         # 工具列（開檔、縮放、翻頁特效、單雙頁、方向、封面單獨）
 │  └─ PageScrubber.vue    # 底部頁碼進度條（可跳頁、顯示檔名）
 ├─ stores/reader.ts       # Pinia 狀態（書、頁碼、方向、縮放、特效、配對）
+├─ stores/library.ts      # 書庫狀態、加入與收藏
 ├─ api/backend.ts         # 封裝 Tauri invoke（含影像解碼）
 └─ App.vue                # 組裝
 
 src-tauri/                # Rust 後端
 └─ src/
    ├─ lib.rs              # 應用進入點、指令註冊
+   ├─ library.rs          # SQLite 書庫、收藏、閱讀進度與封面
    ├─ commands.rs         # IPC 指令（open_path / render_page）＋兩級快取＋預載
    ├─ image_pipeline.rs   # 解碼 → Lanczos3(SIMD) 縮放 → PNG 編碼
    ├─ cache.rs            # 解碼／算繪 LRU 快取
