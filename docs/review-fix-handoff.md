@@ -5,7 +5,7 @@
 ## 固定版本與交付
 
 - 本輪固定審查基準：`197668666a08507a8af796b50befe61b99b8c33e`。
-- 產品修正提交：本輪產品 commit 後，以獨立文件提交填入完整 SHA。該後續文件提交不含產品程式差異。
+- 產品修正提交：`878d2bb6918fe1adbf1b0d394dbec6f6f478bdd3`。其後文件提交僅填入本 SHA，不含產品程式差異；審查產品範圍以基準到本提交為準。
 - A／R1／R2 前輪修正為原補丁無法取得後重新實作；本輪再補強 R1，不宣稱原補丁曾套用。
 - 原工作區 `/workspace/MangaFolio` 保留在 `work`；使用既有乾淨隔離 worktree。遠端起始版本已 fetch 核對等於上述基準。
 
@@ -24,7 +24,7 @@
 | 需求 | 覆蓋 |
 | --- | --- |
 | A：ZIP／CBZ file_stem；資料夾／單圖父資料夾完整名稱 | `archive_titles_reimport_preserves_state_and_folder_dots`，兩種壓縮格式；直接模擬舊標題含副檔名後重新加入，檢查新標題及 ID、收藏、進度、頁名、最近閱讀時間、偏好。全形 `ｂ` 前端搜尋測試。A 產品程式本輪未變。 |
-| R1：舊資料庫两筆來源別名、選任一本不得換 ID | `duplicate_sources_reject_both_selected_ids_and_import_without_switching_reader`，在臨時 SQLite 注入兩筆不同 ID／收藏／進度／偏好／時間；選兩筆及一般重新加入均回傳衝突。前後完整備份 bytes 與 sqlite_sequence 相同；BookSlot Arc、session、generation、next_session 不變。 |
+| R1：舊資料庫兩筆來源別名、選任一本不得換 ID | `duplicate_sources_reject_both_selected_ids_and_import_without_switching_reader`，在臨時 SQLite 注入兩筆不同 ID／收藏／進度／偏好／時間；選兩筆及一般重新加入均回傳衝突。前後完整備份 bytes 與 sqlite_sequence 相同；BookSlot Arc、session、generation、next_session 不變。 |
 | R1：選取來源驗證／交易失敗 | `selected_source_mismatch_and_sql_failure_leave_data_unchanged`：不符來源、已不存在 ID、SQLite trigger 注入 UPDATE 失敗；備份前後不變。 |
 | R1：唯一別名／離線還原上線後開書 | `unique_alias_and_offline_restore_open_selected_id_with_reading_state` 真實 open_source 流程，ID、收藏、頁碼／頁名、偏好、儲存路徑不變；重新加入最近閱讀時間保留。既有 restore/reopen 資料層測試改走 selected ID 註冊。 |
 | R1：Windows 鍵轉換範圍 | `windows_keys_only_convert_absolute_disks_and_complete_unc` 含磁碟、UNC、Volume、GLOBALROOT、device、相對磁碟、不完整 UNC；既有離線 Windows 別名合併／備份重複拒絕測試。 |
@@ -49,7 +49,7 @@ Linux，沿用 `.mangafolio-tools/env.sh` 工具鏈與既有 node_modules／Carg
 
 - Linux **未執行** `#[cfg(windows)] windows_normal_restore_then_verbatim_open_keeps_id`；一般／verbatim／UNC 真實 Windows IO、大小寫／連結別名、斷線分享需 Windows 隔離書庫複驗。
 - **未執行原生介面人工驗收**：兩筆舊重複資料開書錯誤且保留當前閱讀、唯一／離線恢復後續讀、原生 ZIP／CBZ 重新加入、返回書庫收藏再返回閱讀、失敗／等待期間切書。
-- 不全面改寫路徑、不自動修復舊重複資料；多筆來源衝突須使用者另行確認处理。離線且無法解析的不同連結目標不能僅靠字串確認，重新上線後解析；檔案系統來源在檢查後被外部替換的競態仍是既有本機 IO 限制。
+- 不全面改寫路徑、不自動修復舊重複資料；多筆來源衝突須使用者另行確認處理。離線且無法解析的不同連結目標不能僅靠字串確認，重新上線後解析；檔案系統來源在檢查後被外部替換的競態仍是既有本機 IO 限制。
 - 未驗 Windows 打包、安裝、簽章、自動更新、正式發版或大型網路書庫效能。來源比對需解析既有路徑，網路來源延遲仍待實機評估。
 - 未碰 `%APPDATA%\com.racious.mangafolio\library.sqlite3`，不 force push、不合併 main、不發布版本。
 
