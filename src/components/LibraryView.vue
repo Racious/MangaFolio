@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import {
+  PhBooks,
+  PhStar,
+  PhClockCounterClockwise,
+  PhFolderNotchOpen,
+} from "@phosphor-icons/vue";
 import { computed, ref, watch } from "vue";
+import ContinueReading from "./ContinueReading.vue";
 import BookCard from "./BookCard.vue";
 import BookEditor from "./BookEditor.vue";
 import LibraryGuide from "./LibraryGuide.vue";
@@ -116,7 +123,11 @@ const resultLabels = {
       :class="{ expanded: navigationOpen }"
       aria-label="書庫導覽與設定"
     >
-      <div class="brand">MangaFolio<span>你的私人漫畫書庫</span></div>
+      <div class="brand">
+        <PhBooks :size="26" aria-hidden="true" /> MangaFolio<span
+          >你的私人漫畫書庫</span
+        >
+      </div>
       <nav aria-label="書庫篩選">
         <button
           v-for="filter in filters"
@@ -126,8 +137,21 @@ const resultLabels = {
           :disabled="library.managing"
           @click="library.filter = filter.id"
         >
-          {{ filter.label
-          }}<span>{{
+          <span class="nav-label"
+            ><component
+              :is="
+                filter.id === 'all'
+                  ? PhBooks
+                  : filter.id === 'favorites'
+                    ? PhStar
+                    : filter.id === 'recent'
+                      ? PhClockCounterClockwise
+                      : PhFolderNotchOpen
+              "
+              :size="18"
+              aria-hidden="true"
+            />{{ filter.label }}</span
+          ><span>{{
             filter.id === "all"
               ? library.books.length
               : filter.id === "favorites"
@@ -245,7 +269,6 @@ const resultLabels = {
           </button>
         </div>
       </div>
-      <LibraryGuide @highlight="guideTarget = $event" />
       <LibraryManager
         v-if="managementOpen"
         :selected-ids="selectedIds"
@@ -313,7 +336,7 @@ const resultLabels = {
           </ul>
         </details>
       </section>
-      <section
+      <ContinueReading
         v-if="
           library.continueBook &&
           library.filter === 'all' &&
@@ -322,26 +345,11 @@ const resultLabels = {
           library.tagFilter === null &&
           !managementOpen
         "
-        class="continue-panel"
-      >
-        <div>
-          <p class="eyebrow">繼續閱讀</p>
-          <h2>{{ library.continueBook.title }}</h2>
-          <p>
-            第 {{ library.continueBook.lastIndex + 1 }}／{{
-              library.continueBook.pageCount
-            }}
-            頁
-          </p>
-        </div>
-        <button
-          class="primary"
-          :disabled="busy"
-          @click="openBook(library.continueBook.id)"
-        >
-          接著讀
-        </button>
-      </section>
+        :key="`${library.continueBook?.id}:${library.revision}`"
+        :book="library.continueBook!"
+        :busy="busy"
+        @open="openBook"
+      />
       <p v-if="library.filter === 'missing'" class="notice">
         來源可能暫時離線或已移動。資料會保留；進入管理、選取一本後重新指定同一本漫畫來源。
       </p>
@@ -367,6 +375,17 @@ const resultLabels = {
               : ""
           }}
         </p>
+        <div
+          v-if="appearance.settings.view === 'detail' && !managementOpen"
+          class="detail-heading"
+          aria-hidden="true"
+        >
+          <span>封面</span>
+          <div>
+            <span>書籍</span><span>系列／標籤</span><span>閱讀狀態／進度</span
+            ><span>操作</span>
+          </div>
+        </div>
         <section
           class="book-collection"
           :class="appearance.settings.view"
@@ -396,7 +415,10 @@ const resultLabels = {
           顯示更多書籍
         </button>
       </template>
-      <footer>閱讀狀態與續讀位置分開保存 · 來源失效不會自動移除書籍</footer>
+      <footer>
+        <LibraryGuide @highlight="guideTarget = $event" />
+        <p>閱讀狀態與續讀位置分開保存 · 來源失效不會自動移除書籍</p>
+      </footer>
     </div>
     <BookEditor
       v-if="editingBook"
@@ -417,10 +439,11 @@ const resultLabels = {
   overflow: auto;
   padding: 28px 20px;
   background: var(--bg-soft);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--line);
 }
 .brand {
-  font-size: 21px;
+  font-size: 24px;
+  font-family: var(--heading-font);
   font-weight: 700;
   color: var(--accent-soft);
   letter-spacing: 0.3px;
@@ -447,15 +470,22 @@ const resultLabels = {
 }
 .sidebar nav button.active {
   background: var(--panel);
-  border-color: var(--border);
+  border-color: transparent;
+  box-shadow: var(--surface-shadow);
   color: var(--accent-soft);
   font-weight: 600;
+}
+.sidebar nav .nav-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
 }
 .sidebar nav span {
   font-size: 11px;
 }
 .sidebar-section {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
   padding-top: 12px;
   margin-top: 12px;
 }
@@ -488,7 +518,8 @@ const resultLabels = {
   margin-bottom: 24px;
 }
 h1 {
-  font-size: 28px;
+  font-family: var(--heading-font);
+  font-size: 32px;
   margin-top: 6px;
 }
 h2 {
@@ -521,39 +552,49 @@ h2 {
 }
 .view-switch {
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  background: var(--bg-soft);
+  padding: 4px;
+  border-radius: 10px;
 }
 .view-switch button {
-  padding: 8px;
+  padding: 8px 12px;
+  border-color: transparent;
+  background: transparent;
   font-size: 12px;
 }
 .view-switch button[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent-soft);
-  background: var(--bg-soft);
+  background: var(--panel);
+  box-shadow: var(--surface-shadow);
 }
-.continue-panel {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--bg-soft);
-  padding: 16px 20px;
+.detail-heading {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: var(--space);
-}
-.continue-panel div {
-  min-width: 0;
-}
-.continue-panel h2 {
-  margin: 5px 0;
-  font-size: 18px;
-}
-.continue-panel p:last-child {
-  font-size: 12px;
+  gap: var(--space);
+  padding: 12px;
+  border-top: 1px solid var(--line);
   color: var(--text-dim);
+  font-size: 11px;
+}
+.detail-heading > span {
+  width: 76px;
+  flex: 0 0 76px;
+}
+.detail-heading > div {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) minmax(
+      120px,
+      1fr
+    ) 68px;
+  gap: 20px;
+  padding: 0 4px;
+}
+@media (max-width: 1100px) {
+  .detail-heading {
+    display: none;
+  }
 }
 .book-collection {
   display: grid;
@@ -568,6 +609,8 @@ h2 {
 .book-collection.detail,
 .book-collection.compact {
   grid-template-columns: 1fr;
+  gap: 0;
+  border-top: 1px solid var(--line);
 }
 .book-collection.compact {
   gap: 6px;

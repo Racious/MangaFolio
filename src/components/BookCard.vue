@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PhStar, PhPencilSimple } from "@phosphor-icons/vue";
 import { onMounted, onUnmounted, ref } from "vue";
 import { loadCover } from "../api/covers";
 import { progressPercent, statusLabels } from "../lib/library";
@@ -56,7 +57,10 @@ onUnmounted(() => {
   <article
     ref="element"
     class="book-card"
-    :class="[view ?? 'grid', { offline: !book.available, picked: selected }]"
+    :class="[
+      view ?? 'grid',
+      { offline: !book.available, picked: selectable && selected },
+    ]"
   >
     <label v-if="selectable" class="selection">
       <input
@@ -98,10 +102,14 @@ onUnmounted(() => {
         :disabled="favoritePending"
         @click="emit('favorite', book)"
       >
-        {{ book.favorite ? "已收藏" : "收藏" }}
+        <PhStar
+          :weight="book.favorite ? 'fill' : 'regular'"
+          :size="20"
+          aria-hidden="true"
+        />
       </button>
-      <p class="metadata">
-        {{ book.series || "未設定系列"
+      <p v-if="book.series || book.volume" class="metadata">
+        {{ book.series
         }}<span v-if="book.volume"> · 第 {{ book.volume }} 集</span>
       </p>
       <p v-if="book.tags.length" class="tags">
@@ -116,7 +124,7 @@ onUnmounted(() => {
         來源無法存取 · 收藏與進度已保留
         <span class="source-path">{{ book.path }}</span>
       </p>
-      <p v-else>
+      <p v-else class="page-count">
         {{
           book.lastReadAt
             ? `${book.lastIndex + 1} / ${book.pageCount} 頁`
@@ -141,7 +149,7 @@ onUnmounted(() => {
         :aria-label="`編輯資訊：${book.title}`"
         @click="emit('edit', book)"
       >
-        編輯資訊
+        <PhPencilSimple :size="14" aria-hidden="true" /> 編輯資訊
       </button>
     </div>
   </article>
@@ -234,13 +242,16 @@ p {
   position: absolute;
   top: 7px;
   right: 7px;
-  width: 66px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: 0;
   color: var(--text-dim);
   font-size: 12px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .favorite.selected {
   color: var(--accent-soft);
@@ -322,6 +333,7 @@ p {
 .edit {
   margin-top: 10px;
   padding: 5px 8px;
+  white-space: nowrap;
   font-size: 11px;
 }
 .reading-state {
@@ -354,10 +366,9 @@ p {
 }
 .compact .details {
   display: grid;
-  grid-template-columns: minmax(120px, 2fr) minmax(100px, 1fr) minmax(
-      110px,
-      1fr
-    ) 70px;
+  grid-template-columns:
+    minmax(120px, 2fr) minmax(100px, 1fr) minmax(110px, 1fr)
+    70px;
   gap: 8px;
   align-items: center;
 }
@@ -433,6 +444,149 @@ p {
   .compact .tags,
   .compact .reading-state {
     margin-top: 6px;
+  }
+}
+
+/* Decorative surfaces use --line; interactive boundaries retain --border. */
+.book-card {
+  border-color: var(--line);
+  background: var(--panel);
+}
+.grid {
+  align-self: start;
+  background: var(--grid-surface);
+  border-color: var(--grid-outline);
+  padding: var(--grid-inset);
+  overflow: visible;
+}
+.grid .cover {
+  border-radius: calc(var(--radius) - 2px);
+  overflow: hidden;
+  box-shadow: var(--grid-cover-shadow);
+}
+.grid .details {
+  padding: var(--grid-details-space);
+}
+.grid h2 {
+  font-family: var(--heading-font);
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 600;
+  padding-right: 44px;
+}
+.grid p {
+  margin-top: 10px;
+  line-height: 1.6;
+}
+.grid .favorite {
+  top: 18px;
+  right: 8px;
+}
+.grid .format {
+  display: none;
+}
+.grid .edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+  padding-left: 0;
+}
+.progress {
+  background: var(--line);
+  height: 4px;
+}
+.tags span {
+  border: 0;
+  background: var(--bg-soft);
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+.detail,
+.compact {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 12px;
+}
+.detail .details {
+  grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) minmax(
+      120px,
+      1fr
+    ) 68px;
+  gap: 8px 20px;
+  align-items: center;
+}
+.detail h2 {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 16px;
+}
+.detail .metadata {
+  grid-column: 2;
+  grid-row: 1;
+}
+.detail .tags {
+  grid-column: 2;
+  grid-row: 2;
+}
+.detail .reading-state {
+  grid-column: 3;
+  grid-row: 1;
+}
+.detail .page-count {
+  grid-column: 3;
+  grid-row: 2;
+}
+.detail .progress {
+  grid-column: 3;
+  grid-row: 3;
+  margin-top: 0;
+}
+.detail .favorite {
+  grid-column: 4;
+  grid-row: 1;
+}
+.detail .edit {
+  grid-column: 4;
+  grid-row: 2;
+  margin: 0;
+  border-color: transparent;
+  background: transparent;
+  padding: 5px 0;
+}
+.detail .offline-hint {
+  grid-column: 1 / 4;
+  grid-row: 3;
+}
+.compact {
+  padding: 10px 12px;
+}
+.picked {
+  background: var(--bg-soft);
+  box-shadow: inset 3px 0 var(--accent);
+}
+@media (max-width: 1100px) {
+  .detail .details {
+    display: block;
+    position: relative;
+  }
+  .detail h2 {
+    padding-right: 70px;
+  }
+  .detail .favorite {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .detail .edit {
+    margin-top: 8px;
+  }
+  .detail .progress {
+    margin-top: 10px;
   }
 }
 </style>

@@ -6,9 +6,9 @@ from playwright.sync_api import sync_playwright
 from pathlib import Path
 import json, os, time
 root=Path(__file__).resolve().parents[1]
-out=root/'docs/next-phase-results/ui'
+out=root/os.environ.get('MANGAFOLIO_UI_RESULT_DIR','docs/next-phase-results/ui')
 out.mkdir(parents=True,exist_ok=True)
-images=root/'docs/images/next-phase/implemented'
+images=root/os.environ.get('MANGAFOLIO_UI_IMAGE_DIR','docs/images/next-phase/implemented')
 images.mkdir(parents=True,exist_ok=True)
 script=r'''
 localStorage.setItem('mangafolio.library-guide.v1.hidden','true');
@@ -88,7 +88,11 @@ with sync_playwright() as p:
   page.get_by_label('介面風格',exact=True).select_option(style)
   page.get_by_label('明暗主題',exact=True).select_option(theme)
   page.get_by_label('書庫檢視',exact=True).select_option(view)
+  page.get_by_text('外觀設定',exact=True).click()
+  page.set_viewport_size({'width':1440,'height':1200})
   page.screenshot(path=str(images/f'{style}-{theme}-{view}.png'))
+  page.set_viewport_size({'width':1440,'height':1000})
+  page.get_by_text('外觀設定',exact=True).click()
  page.get_by_label('顯示密度',exact=True).select_option('compact')
  page.get_by_label('網格封面尺寸',exact=True).select_option('large')
  page.reload();page.locator('.book-card').nth(3).wait_for()

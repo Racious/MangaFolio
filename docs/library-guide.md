@@ -66,3 +66,8 @@ npm run tauri dev
 ## 驗證與交辦
 
 圖為實際 Vue 畫面與隔離 in-memory IPC，不是原生 Windows 驗收。Linux 原生證據、測試輸出及未執行項目見 [本輪驗證](next-phase-validation.md)；獨立審查與 Windows 逐步清單見 [審查交辦](next-phase-review-assignment.md)。未發布安裝包。
+
+
+## 本次介面精修與閱讀工具列
+
+[完整實際画面預覽](ui-refinement-preview.md)包含三種風格與閱讀器。開書後上下工具列預設隱藏，滑鼠移到上、下邊緣會顯示；Esc 可切換，Tab 聚焦控制項時也會顯示，觸控裝置可點「工具列」。上方的「書庫」返回書库。工具列顯示不會擠縮圖片，既有縮放設定及比例保留；儲存失敗及重試入口仍可見。

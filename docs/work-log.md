@@ -69,3 +69,12 @@
 - 舊 schema 升級／v1 備份使用相同規則；未全庫回填 v2 或變更路徑識別。
 - 本次 npm16／Rust37、build與diff-check通過，新增奇偶頁／封面／手動狀態、真實來源變化、metadata保存及注入SQL失敗測試。完整輸出 review-fix-n1-n2/。
 - 產品提交 `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`，後續僅文件提交。未操作實際使用者庫；Windows cfg／native未執行，待複審。交辦 next-phase-review-fix-handoff.md。
+
+
+## 2026-10-04｜介面精修與沉浸閱讀預覽
+
+以 `54fc37596d5d34bfed72760bb8770969ab9f7774` 為基準，保留審查報告，重新比對三種原設計方向及實際畫面。調整封面尺寸、書名層次、續讀區、列表欄位、圖示及裝飾邊界，風格差異集中到主題參數。開書時上下工具列預設隱藏，hover、鍵盤焦點、Esc 與觸控可開啟；工具列覆蓋畫布，錯誤與重試仍可見。
+
+隔離瀏覽器及 Linux Tauri 有實際截图，驗證輸出另存 `docs/next-phase-results/visual-refinement`，不覆蓋歷史證據。本次先提供 [完整畫面](ui-refinement-preview.md) 給使用者看，修改保留工作區，未產生本次提交。Windows 原生及實體觸控尚未驗收。
+
+使用者後續授權將目前功能分支合併主線，要求保留 merge commit；先提交介面精修及隔離驗證證據，再以 `--no-ff` 合併。Windows 本次原生驗收仍未執行，合併不代表發布版本。

@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, watch } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import LibraryView from "./components/LibraryView.vue";
 import Toolbar from "./components/Toolbar.vue";
+import ImmersiveReader from "./components/ImmersiveReader.vue";
 import ReaderView from "./components/ReaderView.vue";
 import PageScrubber from "./components/PageScrubber.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
@@ -91,25 +92,35 @@ onUnmounted(() => {
 <template>
   <div class="app">
     <LibraryView v-if="library.screen === 'library'" />
-    <template v-else>
-      <Toolbar @library="returnToLibrary" />
+    <ImmersiveReader v-else :key="reader.bookId ?? 'empty'">
       <ReaderView />
-      <PageScrubber />
-      <p v-if="reader.error" class="error-bar" role="alert">
-        {{ reader.error }}
-      </p>
-    </template>
-    <p v-if="reader.progressError" class="error-bar" role="alert">
-      {{ reader.progressError }} <button @click="retrySave">重試儲存</button>
-    </p>
+      <template #top><Toolbar @library="returnToLibrary" /></template>
+      <template #bottom>
+        <PageScrubber />
+        <p v-if="reader.hasBook" class="save-status" role="status">
+          {{
+            reader.savingProgress
+              ? "正在儲存閱讀進度…"
+              : "閱讀進度自動儲存在本機 · Esc 顯示／隱藏工具列"
+          }}
+        </p>
+      </template>
+      <template #alerts>
+        <p v-if="reader.error" class="error-bar" role="alert">
+          {{ reader.error }}
+        </p>
+        <p v-if="reader.progressError" class="error-bar" role="alert">
+          {{ reader.progressError }}
+          <button @click="retrySave">重試儲存</button>
+        </p>
+      </template>
+    </ImmersiveReader>
     <p
-      v-else-if="library.screen === 'reader' && reader.hasBook"
-      class="save-status"
-      role="status"
+      v-if="library.screen === 'library' && reader.progressError"
+      class="error-bar"
+      role="alert"
     >
-      {{
-        reader.savingProgress ? "正在儲存閱讀進度…" : "閱讀進度自動儲存在本機"
-      }}
+      {{ reader.progressError }} <button @click="retrySave">重試儲存</button>
     </p>
     <UpdateDialog />
   </div>
