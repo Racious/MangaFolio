@@ -90,7 +90,7 @@ pub fn open_path(
     library: State<Library>,
 ) -> Result<BookInfo, String> {
     let explicit_image = std::path::Path::new(&path).is_file() && book::is_image(&path);
-    open_source(&path, !explicit_image, &state, &library)
+    open_source(&path, !explicit_image, None, &state, &library)
 }
 
 #[tauri::command]
@@ -100,17 +100,18 @@ pub fn open_library_book(
     library: State<Library>,
 ) -> Result<BookInfo, String> {
     let entry = library.get(id)?;
-    open_source(&entry.path, true, &state, &library)
+    open_source(&entry.path, true, Some(id), &state, &library)
 }
 
 fn open_source(
     path: &str,
     resume: bool,
+    selected_id: Option<i64>,
     state: &AppState,
     library: &Library,
 ) -> Result<BookInfo, String> {
     let result = book::open(path)?;
-    let saved = library.register(&result.book)?;
+    let saved = library.register_selected(&result.book, selected_id)?;
     let pages = result.book.page_names();
     let start_index = if resume {
         library::resume_index(&saved, &pages)
@@ -303,6 +304,158 @@ fn spawn_preload_worker(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unique_alias_and_offline_restore_open_selected_id_with_reading_state() {
+        let root = std::env::temp_dir().join(format!(
+            "mangafolio-selected-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("pages")).unwrap();
+        for name in ["1.png", "2.png"] {
+            image::RgbImage::new(4, 4)
+                .save(root.join("pages").join(name))
+                .unwrap();
+        }
+        let library = Library::open(&root.join("data")).unwrap();
+        let path = root.join("pages").to_string_lossy().into_owned();
+        let prefs = ReaderPreferences {
+            direction: "ltr".into(),
+            ..Default::default()
+        };
+        for offline in [false, true] {
+            let entry = library.register(&book::open(&path).unwrap().book).unwrap();
+            library.favorite(entry.id, true).unwrap();
+            library.save_progress(entry.id, 1, "2.png", &prefs).unwrap();
+            let mut backup: serde_json::Value =
+                serde_json::from_slice(&library.backup_json().unwrap()).unwrap();
+            backup["books"][0]["path"] = root
+                .join("pages/../pages")
+                .to_string_lossy()
+                .into_owned()
+                .into();
+            library.remove(&[entry.id]).unwrap();
+            if offline {
+                std::fs::rename(root.join("pages"), root.join("offline")).unwrap();
+            }
+            library
+                .restore_json(&serde_json::to_vec(&backup).unwrap())
+                .unwrap();
+            let restored = library.list().unwrap().pop().unwrap();
+            assert_eq!(restored.available, !offline);
+            if offline {
+                std::fs::rename(root.join("offline"), root.join("pages")).unwrap();
+            }
+            let reimport = library.register(&book::open(&path).unwrap().book).unwrap();
+            assert_eq!(restored.id, reimport.id);
+            assert_eq!(restored.last_read_at, reimport.last_read_at);
+            let state = AppState::default();
+            let info =
+                open_source(&restored.path, true, Some(restored.id), &state, &library).unwrap();
+            assert_eq!(info.book_id, restored.id);
+            assert!(info.favorite);
+            assert_eq!(info.preferences, prefs);
+            assert_eq!(info.start_index, 1);
+            let saved = library.get(restored.id).unwrap();
+            assert_eq!(saved.last_page_name.as_deref(), Some("2.png"));
+            assert_eq!(saved.last_index, 1);
+            assert_eq!(saved.path, restored.path);
+            assert_eq!(library.list().unwrap().len(), 1);
+        }
+        drop(library);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_sources_reject_both_selected_ids_and_import_without_switching_reader() {
+        let root = std::env::temp_dir().join(format!(
+            "mangafolio-conflict-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("pages")).unwrap();
+        std::fs::create_dir_all(root.join("current")).unwrap();
+        for folder in ["pages", "current"] {
+            for name in ["1.png", "2.png"] {
+                image::RgbImage::new(4, 4)
+                    .save(root.join(folder).join(name))
+                    .unwrap();
+            }
+        }
+        let library = Library::open(&root.join("data")).unwrap();
+        let path = root.join("pages").to_string_lossy().into_owned();
+        let first = library.register(&book::open(&path).unwrap().book).unwrap();
+        let prefs = ReaderPreferences {
+            direction: "ltr".into(),
+            page_mode: "double".into(),
+            ..Default::default()
+        };
+        library.favorite(first.id, true).unwrap();
+        library.save_progress(first.id, 1, "2.png", &prefs).unwrap();
+        let alias = root.join("pages/../pages").to_string_lossy().into_owned();
+        let connection = rusqlite::Connection::open(root.join("data/library.sqlite3")).unwrap();
+        connection.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at)
+            SELECT ?1,'legacy alias',format,page_count,0,0,'1.png',123,?2,created_at FROM books WHERE id=?3",
+            rusqlite::params![alias, serde_json::to_string(&ReaderPreferences::default()).unwrap(), first.id]).unwrap();
+        let second_id = connection.last_insert_rowid();
+        let state = AppState::default();
+        let current_path = root.join("current").to_string_lossy().into_owned();
+        let active = open_source(&current_path, true, None, &state, &library).unwrap();
+        let current_book = state.book.lock().unwrap().as_ref().unwrap().1.clone();
+        let generation = state.generation.load(Ordering::SeqCst);
+        let next_session = state.next_session.load(Ordering::SeqCst);
+        let before = library.backup_json().unwrap();
+        let sequence: i64 = connection
+            .query_row(
+                "SELECT seq FROM sqlite_sequence WHERE name='books'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        for id in [first.id, second_id] {
+            let entry = library.get(id).unwrap();
+            let error = open_source(&entry.path, true, Some(id), &state, &library)
+                .err()
+                .unwrap();
+            assert!(error.contains("來源衝突"));
+            assert_eq!(library.backup_json().unwrap(), before);
+            let slot = state.book.lock().unwrap();
+            assert_eq!(slot.as_ref().unwrap().0, active.session_id);
+            assert!(Arc::ptr_eq(&slot.as_ref().unwrap().1, &current_book));
+            assert_eq!(state.generation.load(Ordering::SeqCst), generation);
+            assert_eq!(state.next_session.load(Ordering::SeqCst), next_session);
+        }
+        assert!(library
+            .register(&book::open(&path).unwrap().book)
+            .unwrap_err()
+            .contains("來源衝突"));
+        assert!(open_source(&path, true, None, &state, &library)
+            .err()
+            .unwrap()
+            .contains("來源衝突"));
+        assert_eq!(library.backup_json().unwrap(), before);
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT seq FROM sqlite_sequence WHERE name='books'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            sequence
+        );
+        drop(connection);
+        drop(library);
+        drop(state);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn old_session_cannot_use_new_book_or_its_cached_pixels() {

@@ -1,0 +1,18 @@
+{
+  "npm-test": {
+    "command": "npm test",
+    "exitCode": 0
+  },
+  "npm-build": {
+    "command": "npm run build",
+    "exitCode": 0
+  },
+  "diff-check": {
+    "command": "git diff --check",
+    "exitCode": 0
+  },
+  "cargo-test": {
+    "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "exitCode": 0
+  }
+}

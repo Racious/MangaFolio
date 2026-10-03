@@ -83,3 +83,10 @@ test("natural title sorting and recent sorting do not mutate stored library orde
     [1, 2, 3],
   );
 });
+
+test("full-width b searches titles without matching archive path extensions", () => {
+  const books = [book(1, "海邊故事"), book(2, "Blue Stories")];
+  books[0].path = "/books/海邊故事.cbz";
+  books[1].path = "/books/Blue Stories.cbz";
+  assert.deepEqual(filterBooks(books, "ｂ", "all").map(b => b.id), [2]);
+});

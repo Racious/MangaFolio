@@ -106,15 +106,39 @@ fn row_book(row: &rusqlite::Row<'_>) -> rusqlite::Result<LibraryBook> {
 // Identity keys do not change the persisted/displayed path format. Available
 // sources resolve aliases; offline Windows paths still match verbatim spellings.
 fn source_key(path: &str) -> String {
+    // Do not resolve other Windows device namespaces into ordinary disk keys.
+    if path.starts_with(r"\\.\") || (path.starts_with(r"\\?\") && windows_source_key(path) == path)
+    {
+        return path.to_owned();
+    }
     let resolved = Path::new(path).canonicalize().ok();
     let value = resolved
         .as_ref()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_owned());
+    windows_source_key(&value)
+}
+
+fn windows_source_key(value: &str) -> String {
     if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
-        return format!(r"\\{}", unc);
+        let mut parts = unc.split('\\');
+        if parts.next().is_some_and(|server| !server.is_empty())
+            && parts.next().is_some_and(|share| !share.is_empty())
+        {
+            return format!(r"\\{}", unc);
+        }
     }
-    value.strip_prefix(r"\\?\").unwrap_or(&value).to_owned()
+    if let Some(disk) = value.strip_prefix(r"\\?\") {
+        let bytes = disk.as_bytes();
+        if bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && bytes[2] == b'\\'
+        {
+            return disk.to_owned();
+        }
+    }
+    value.to_owned()
 }
 
 fn source_id(
@@ -122,15 +146,6 @@ fn source_id(
     path: &str,
     exclude: Option<i64>,
 ) -> Result<Option<i64>, String> {
-    let exact = connection
-        .query_row("SELECT id FROM books WHERE path=?1", [path], |r| {
-            r.get::<_, i64>(0)
-        })
-        .optional()
-        .map_err(db_error)?;
-    if exact.is_some() && exact != exclude {
-        return Ok(exact);
-    }
     let key = source_key(path);
     let mut statement = connection
         .prepare("SELECT id,path FROM books ORDER BY id")
@@ -138,13 +153,19 @@ fn source_id(
     let rows = statement
         .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
         .map_err(db_error)?;
+    let mut matched = None;
     for row in rows {
         let (id, stored) = row.map_err(db_error)?;
         if Some(id) != exclude && source_key(&stored) == key {
-            return Ok(Some(id));
+            if matched.is_some() {
+                return Err(
+                    "來源衝突：多筆書籍指向同一來源，未修改任何紀錄；請先確認書庫資料。".into(),
+                );
+            }
+            matched = Some(id);
         }
     }
-    Ok(None)
+    Ok(matched)
 }
 
 impl Library {
@@ -206,6 +227,14 @@ impl Library {
     }
 
     pub fn register(&self, book: &book::Book) -> Result<LibraryBook, String> {
+        self.register_selected(book, None)
+    }
+
+    pub(crate) fn register_selected(
+        &self,
+        book: &book::Book,
+        selected: Option<i64>,
+    ) -> Result<LibraryBook, String> {
         let path = book
             .source_path()
             .canonicalize()
@@ -213,8 +242,25 @@ impl Library {
             .to_string_lossy()
             .into_owned();
         let preferences = serde_json::to_string(&ReaderPreferences::default()).map_err(db_error)?;
-        let connection = self.connection.lock().map_err(db_error)?;
-        let alias_id = source_id(&connection, &path, None)?
+        let mut guard = self.connection.lock().map_err(db_error)?;
+        let connection = guard
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(db_error)?;
+        if let Some(id) = selected {
+            let stored: String = connection
+                .query_row("SELECT path FROM books WHERE id=?1", [id], |r| r.get(0))
+                .optional()
+                .map_err(db_error)?
+                .ok_or_else(|| "選取的書籍已不存在。".to_string())?;
+            if source_key(&stored) != source_key(&path) {
+                return Err("來源衝突：選取書籍與實際開啟來源不一致，未修改任何紀錄。".into());
+            }
+        }
+        let matched = source_id(&connection, &path, None)?;
+        if selected.is_some() && matched != selected {
+            return Err("來源衝突：無法保留選取的書籍 ID，未修改任何紀錄。".into());
+        }
+        let alias_id = matched
             .map(|id| {
                 connection
                     .query_row("SELECT path FROM books WHERE id=?1", [id], |r| {
@@ -232,25 +278,29 @@ impl Library {
                     params![book.title, book.format(), book.len(), id],
                 )
                 .map_err(db_error)?;
-            return connection
+            let updated = connection
                 .query_row(
                     &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
                     [id],
                     row_book,
                 )
-                .map_err(db_error);
+                .map_err(db_error)?;
+            connection.commit().map_err(db_error)?;
+            return Ok(updated);
         }
         connection.execute("INSERT INTO books(path,title,format,page_count,preferences,created_at)
             VALUES(?1,?2,?3,?4,?5,?6)
             ON CONFLICT(path) DO UPDATE SET title=excluded.title,format=excluded.format,page_count=excluded.page_count",
             params![path, book.title, book.format(), book.len(), preferences, now()]).map_err(db_error)?;
-        connection
+        let updated = connection
             .query_row(
                 &format!("SELECT {COLUMNS} FROM books WHERE path=?1"),
                 [path],
                 row_book,
             )
-            .map_err(db_error)
+            .map_err(db_error)?;
+        connection.commit().map_err(db_error)?;
+        Ok(updated)
     }
 
     pub fn mark_opened(&self, id: i64) -> Result<(), String> {
@@ -730,6 +780,51 @@ mod tests {
     }
 
     #[test]
+    fn windows_keys_only_convert_absolute_disks_and_complete_unc() {
+        for (input, expected) in [
+            (r"\\?\C:\books\pages", r"C:\books\pages"),
+            (r"\\?\z:\books", r"z:\books"),
+            (r"\\?\UNC\server\share\pages", r"\\server\share\pages"),
+            (r"\\?\Volume{123}\pages", r"\\?\Volume{123}\pages"),
+            (r"\\?\GLOBALROOT\Device\disk", r"\\?\GLOBALROOT\Device\disk"),
+            (r"\\.\C:\books", r"\\.\C:\books"),
+            (r"\\?\C:relative", r"\\?\C:relative"),
+            (r"\\?\UNC\server", r"\\?\UNC\server"),
+            (r"\\?\UNC\server\", r"\\?\UNC\server\"),
+        ] {
+            assert_eq!(windows_source_key(input), expected);
+            if input == expected {
+                assert_eq!(source_key(input), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn selected_source_mismatch_and_sql_failure_leave_data_unchanged() {
+        let f = Fixture::new();
+        let other = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        let before = library.backup_json().unwrap();
+        assert!(library
+            .register_selected(&other.book(), Some(entry.id))
+            .unwrap_err()
+            .contains("來源衝突"));
+        assert_eq!(before, library.backup_json().unwrap());
+        library.connection.lock().unwrap().execute_batch(
+            "CREATE TRIGGER reject_title BEFORE UPDATE OF title ON books BEGIN SELECT RAISE(ABORT, 'test rejection'); END;"
+        ).unwrap();
+        assert!(library
+            .register_selected(&f.book(), Some(entry.id))
+            .is_err());
+        assert_eq!(before, library.backup_json().unwrap());
+        assert!(library
+            .register_selected(&f.book(), Some(entry.id + 99))
+            .is_err());
+        assert_eq!(before, library.backup_json().unwrap());
+    }
+
+    #[test]
     fn restore_alias_merge_duplicates_and_reopen_preserve_state() {
         let f = Fixture::new();
         let library = f.library();
@@ -756,7 +851,9 @@ mod tests {
         library.remove(&[entry.id]).unwrap();
         library.restore_json(&bytes).unwrap();
         let restored = library.list().unwrap().pop().unwrap();
-        let reopened = library.register(&f.book()).unwrap();
+        let reopened = library
+            .register_selected(&f.book(), Some(restored.id))
+            .unwrap();
         assert_eq!(reopened.id, restored.id);
         assert!(reopened.favorite);
         assert_eq!(reopened.last_index, 1);
@@ -781,7 +878,9 @@ mod tests {
         let restored = library.list().unwrap().pop().unwrap();
         assert!(!restored.available);
         std::fs::rename(f.0.join("offline"), f.0.join("pages")).unwrap();
-        let reopened = library.register(&f.book()).unwrap();
+        let reopened = library
+            .register_selected(&f.book(), Some(restored.id))
+            .unwrap();
         assert_eq!(restored.id, reopened.id);
         assert!(reopened.favorite);
         assert_eq!(reopened.last_index, 1);
@@ -839,7 +938,9 @@ mod tests {
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .unwrap();
         let restored = library.list().unwrap().pop().unwrap();
-        let reopened = library.register(&f.book()).unwrap();
+        let reopened = library
+            .register_selected(&f.book(), Some(restored.id))
+            .unwrap();
         assert_eq!(restored.id, reopened.id);
         assert!(reopened.favorite);
         assert_eq!(reopened.last_index, 1);
@@ -872,7 +973,20 @@ mod tests {
             };
             library.favorite(entry.id, true).unwrap();
             library.save_progress(entry.id, 1, "2.png", &prefs).unwrap();
+            library
+                .connection
+                .lock()
+                .unwrap()
+                .execute(
+                    "UPDATE books SET title=?1 WHERE id=?2",
+                    params![format!("Volume.01.{extension}"), entry.id],
+                )
+                .unwrap();
+            let before = library.get(entry.id).unwrap();
             let updated = library.register(&opened).unwrap();
+            assert_eq!(updated.title, "Volume.01");
+            assert_eq!(updated.last_read_at, before.last_read_at);
+            assert_eq!(updated.last_page_name, before.last_page_name);
             assert_eq!(entry.id, updated.id);
             assert!(updated.favorite);
             assert_eq!(updated.last_index, 1);
