@@ -13,7 +13,12 @@ Repository：Racious/MangaFolio。分支：`feature/library-management-ui`。
 
 同時閱讀 `review-report.md`、`review-fix-handoff.md`、`review-fix-report-r2.md`、`next-phase-plan.md` 及 `next-phase-validation.md`；審查實際差異、測試及產品流程，不只讀交辦單宣告通過。核對既有 A／R1／R2 與本輪 F1–F6／U1–U8 是否完整達成。
 
-獨立結果寫入 `docs/next-phase-review-report.md`。每個問題提供位置、觸發條件、影響、嚴重度及建議修法；列出實際執行與未執行項目。未經另行授權，不自行修改產品、提交或推送。不得操作使用者實際 `%APPDATA%\com.racious.mangafolio\library.sqlite3`；用測試 Windows 帳戶／VM 的隔離資料目錄及臨時來源。不要 force push、合併 main 或發版。
+必須同時審查兩個固定範圍：
+
+- 聚焦修正：`1394670f3b4ac63ab69fcedcabb650a2b0e97879` → `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`。
+- 整體下一階段：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8` → `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`。
+
+先判定 N1／N2 是否修復，再檢查 F1–F6、UI（U1–U8）及 A／R1／R2 是否因修正退化；兩種範圍須分別列出判定與證據。原報告 `docs/next-phase-review-report.md` 保留不改，新結果寫入 `docs/next-phase-review-fix-report.md`。每個問題提供位置、觸發條件、影響、嚴重度及建議修法；列出實際執行與未執行項目。未經另行授權，不自行修改產品、提交或推送。不得操作使用者實際 `%APPDATA%\com.racious.mangafolio\library.sqlite3`；用測試 Windows 帳戶／VM 的隔離資料目錄及臨時來源。不要 force push、合併 main 或發版。
 
 ## 新功能與修改入口
 
@@ -43,7 +48,15 @@ Repository：Racious/MangaFolio。分支：`feature/library-management-ui`。
 
 ## 測試與實機清單
 
-完整輸出及退出碼見 `next-phase-results/final/` 與 `next-phase-results/ui/`；本次 npm 15／Rust34、build、diff-check 通過。Browser mock 和 Linux 原生證據的界線見驗證文件。Windows cfg 測試及 Windows native 矩陣尚未執行。
+最新產品固定為 `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`。驗證分輪列示，不能互相替代：
+
+| 驗證輪次 | 結果與證據 | 邊界 |
+| --- | --- | --- |
+| 首輪獨立 Windows 審查 | npm 15／Rust 35，見 `next-phase-review-report.md` | 固定首輪產品 08ccc3e；包含 Windows cfg，但未完成 Windows 原生 UI 驗收 |
+| N1／N2 修正後 Linux | npm 16／Rust 37、build、diff-check 通過；完整輸出及退出碼在 `next-phase-results/review-fix-n1-n2/` | 固定最新產品 10af40e；最新修正尚待獨立複審與 Windows 驗證，Windows cfg／native 本輪未執行 |
+| 首輪 Linux 歷史結果 | npm 15／Rust 34、build、diff-check 通過；`next-phase-results/final/` 與 `next-phase-results/ui/` | 首輪當時 Windows cfg／native 未執行；這是歷史紀錄，不是最新修正驗證 |
+
+首輪 Windows 通過不得視為最新修正已通過 Windows。Browser mock、Linux 原生證據與未執行項目的界線見 `next-phase-validation.md`。
 
 在隔離 Windows VM／帳戶逐步驗收：
 
@@ -58,6 +71,14 @@ Repository：Racious/MangaFolio。分支：`feature/library-management-ui`。
 9. 640×480／高 DPI、長書名及標籤、大量資料；Tab／Shift-Tab、編輯 dialog 焦點與 Escape、螢幕閱讀器；中文 IME 組字時方向鍵不翻頁。明暗對比、失敗文字、無結果／空庫下一步。
 10. 教學不強制彈出，開啟、跳步、關閉、重開。跨 reader／書庫、正常關閉立即重啟保留進度；管理／匯入中不能丟失正在操作。
 11. 10000 本真實來源、封面解碼與 UNC 可用性檢查，記錄搜尋、首屏、滾動／載入更多耗時；現有同步來源檢查可能慢，不能把 Linux 離線測試當網路效能保證。
+
+## 既有 v2 陳舊自動狀態的隔離驗收
+
+依 [修正複審交辦的 v2 案例](next-phase-review-fix-handoff.md#既有-v2-陳舊狀態驗收) 建立隔離 v2 資料庫及備份，分別重現末跨頁仍為 reading，以及來源增頁後仍為 read。不得使用正式 APPDATA 庫。啟動／還原不全面回填，v2 還原保留保存值，此行為也必須驗收。
+
+每個案例從相同隔離快照重新開始，逐一檢查重新開書、保存進度、重新加入、relink、選「依進度判定」後狀態何時更新，並核對重新載入書庫後的已讀篩選與繼續閱讀候選一致。確認自動操作不覆寫手動已讀／未讀；使用者明確選「依進度判定」是解除手動標記的既有操作，須另行記錄。核對教學文件清楚說明舊自動狀態的更新方式，並檢查程式內教學是否足夠；不足時回報具體位置與建議，不自行修改 UI。
+
+若不回填或保留 v2 備份原值與產品需求不符，提出可重現案例、影響、具體修法及資料／交易風險，待另行授權；不得直接執行全庫遷移。此次文件調整不擴大產品修改範圍。
 
 ## 已知限制與風險
 
