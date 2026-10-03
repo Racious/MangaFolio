@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { useReaderStore } from "./reader";
 import {
   importBook,
   listLibrary,
@@ -79,6 +80,8 @@ export const useLibraryStore = defineStore("library", {
         await setFavorite(book.id, favorite);
         const current = this.books.find((entry) => entry.id === book.id);
         if (current) current.favorite = favorite;
+        const reader = useReaderStore();
+        if (reader.bookId === book.id) reader.favorite = favorite;
       } catch (e) {
         this.error = String(e);
       } finally {

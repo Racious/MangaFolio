@@ -109,7 +109,10 @@ pub fn open(path: &str) -> Result<OpenResult, String> {
                 entries.sort_by(|a, b| natural_cmp(a, b));
                 return Ok(OpenResult {
                     book: Book {
-                        title: dir_title(p, path),
+                        title: p
+                            .file_stem()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| path.to_string()),
                         source: Source::Zip(p.to_path_buf()),
                         entries,
                     },

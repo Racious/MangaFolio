@@ -103,6 +103,50 @@ fn row_book(row: &rusqlite::Row<'_>) -> rusqlite::Result<LibraryBook> {
     })
 }
 
+// Identity keys do not change the persisted/displayed path format. Available
+// sources resolve aliases; offline Windows paths still match verbatim spellings.
+fn source_key(path: &str) -> String {
+    let resolved = Path::new(path).canonicalize().ok();
+    let value = resolved
+        .as_ref()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_owned());
+    if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{}", unc);
+    }
+    value.strip_prefix(r"\\?\").unwrap_or(&value).to_owned()
+}
+
+fn source_id(
+    connection: &Connection,
+    path: &str,
+    exclude: Option<i64>,
+) -> Result<Option<i64>, String> {
+    let exact = connection
+        .query_row("SELECT id FROM books WHERE path=?1", [path], |r| {
+            r.get::<_, i64>(0)
+        })
+        .optional()
+        .map_err(db_error)?;
+    if exact.is_some() && exact != exclude {
+        return Ok(exact);
+    }
+    let key = source_key(path);
+    let mut statement = connection
+        .prepare("SELECT id,path FROM books ORDER BY id")
+        .map_err(db_error)?;
+    let rows = statement
+        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+        .map_err(db_error)?;
+    for row in rows {
+        let (id, stored) = row.map_err(db_error)?;
+        if Some(id) != exclude && source_key(&stored) == key {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
+}
+
 impl Library {
     pub fn open(directory: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(directory).map_err(db_error)?;
@@ -170,6 +214,32 @@ impl Library {
             .into_owned();
         let preferences = serde_json::to_string(&ReaderPreferences::default()).map_err(db_error)?;
         let connection = self.connection.lock().map_err(db_error)?;
+        let alias_id = source_id(&connection, &path, None)?
+            .map(|id| {
+                connection
+                    .query_row("SELECT path FROM books WHERE id=?1", [id], |r| {
+                        r.get::<_, String>(0)
+                    })
+                    .map(|stored| (stored != path).then_some(id))
+                    .map_err(db_error)
+            })
+            .transpose()?
+            .flatten();
+        if let Some(id) = alias_id {
+            connection
+                .execute(
+                    "UPDATE books SET title=?1,format=?2,page_count=?3 WHERE id=?4",
+                    params![book.title, book.format(), book.len(), id],
+                )
+                .map_err(db_error)?;
+            return connection
+                .query_row(
+                    &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
+                    [id],
+                    row_book,
+                )
+                .map_err(db_error);
+        }
         connection.execute("INSERT INTO books(path,title,format,page_count,preferences,created_at)
             VALUES(?1,?2,?3,?4,?5,?6)
             ON CONFLICT(path) DO UPDATE SET title=excluded.title,format=excluded.format,page_count=excluded.page_count",
@@ -363,14 +433,7 @@ impl Library {
                 row_book,
             )
             .map_err(db_error)?;
-        let duplicate: Option<i64> = transaction
-            .query_row(
-                "SELECT id FROM books WHERE path=?1 AND id<>?2",
-                params![path, id],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(db_error)?;
+        let duplicate = source_id(&transaction, &path, Some(id))?;
         if duplicate.is_some() {
             return Err("這個來源已在書庫中，請選擇其他來源。".into());
         }
@@ -459,7 +522,7 @@ impl Library {
                     .as_ref()
                     .is_some_and(|s| s.len() > 32_768)
                 || book.last_read_at.is_some_and(|t| t < 0)
-                || !paths.insert(book.path.clone())
+                || !paths.insert(source_key(&book.path))
             {
                 return Err("備份含無效或重複的書籍資料，未還原任何項目。".into());
             }
@@ -470,8 +533,28 @@ impl Library {
             added: 0,
             skipped: 0,
         };
+        // Resolve existing paths once, rather than scanning/canonicalizing the
+        // whole library for every item in a large backup.
+        let stored_paths: std::collections::HashSet<String> = {
+            let mut statement = transaction
+                .prepare("SELECT path FROM books")
+                .map_err(db_error)?;
+            let rows = statement
+                .query_map([], |r| r.get::<_, String>(0))
+                .map_err(db_error)?;
+            rows.collect::<Result<_, _>>().map_err(db_error)?
+        };
+        let mut existing_keys: std::collections::HashSet<String> =
+            stored_paths.iter().map(|p| source_key(p)).collect();
         for book in backup.books {
-            // New IDs are generated; existing paths keep their current metadata.
+            // Compare identities while preserving the supplied storage path spelling.
+            let key = source_key(&book.path);
+            if existing_keys.contains(&key) && !stored_paths.contains(&book.path) {
+                result.skipped += 1;
+                continue;
+            }
+            existing_keys.insert(key);
+            // New IDs are generated; existing sources keep their current metadata.
             let preferences = serde_json::to_string(&book.preferences).map_err(db_error)?;
             let added = transaction.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(path) DO NOTHING", params![book.path, book.title, book.format, book.page_count, book.favorite, book.last_index, book.last_page_name, book.last_read_at, preferences, now()]).map_err(db_error)?;
             if added == 1 {
@@ -643,6 +726,164 @@ mod tests {
     impl Drop for Fixture {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn restore_alias_merge_duplicates_and_reopen_preserve_state() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        let prefs = ReaderPreferences {
+            direction: "ltr".into(),
+            ..Default::default()
+        };
+        library.favorite(entry.id, true).unwrap();
+        library.save_progress(entry.id, 1, "2.png", &prefs).unwrap();
+        let mut backup: LibraryBackup =
+            serde_json::from_slice(&library.backup_json().unwrap()).unwrap();
+        backup.books[0].path = f.0.join("pages/../pages").to_string_lossy().into_owned();
+        let bytes = serde_json::to_vec(&backup).unwrap();
+        library.favorite(entry.id, false).unwrap();
+        assert_eq!(library.restore_json(&bytes).unwrap().skipped, 1);
+        assert!(!library.get(entry.id).unwrap().favorite);
+        assert_eq!(library.register(&f.book()).unwrap().id, entry.id);
+        backup.books.push(entry.clone());
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.list().unwrap().len(), 1);
+        library.remove(&[entry.id]).unwrap();
+        library.restore_json(&bytes).unwrap();
+        let restored = library.list().unwrap().pop().unwrap();
+        let reopened = library.register(&f.book()).unwrap();
+        assert_eq!(reopened.id, restored.id);
+        assert!(reopened.favorite);
+        assert_eq!(reopened.last_index, 1);
+        assert_eq!(reopened.last_page_name.as_deref(), Some("2.png"));
+        assert_eq!(reopened.preferences, prefs);
+        assert_eq!(library.list().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn offline_restore_reconnect_keeps_identity_and_settings() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        library.favorite(entry.id, true).unwrap();
+        library
+            .save_progress(entry.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        let bytes = library.backup_json().unwrap();
+        library.remove(&[entry.id]).unwrap();
+        std::fs::rename(f.0.join("pages"), f.0.join("offline")).unwrap();
+        library.restore_json(&bytes).unwrap();
+        let restored = library.list().unwrap().pop().unwrap();
+        assert!(!restored.available);
+        std::fs::rename(f.0.join("offline"), f.0.join("pages")).unwrap();
+        let reopened = library.register(&f.book()).unwrap();
+        assert_eq!(restored.id, reopened.id);
+        assert!(reopened.favorite);
+        assert_eq!(reopened.last_index, 1);
+        assert_eq!(library.list().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn windows_offline_spellings_merge_and_reject_duplicate_backup() {
+        let f = Fixture::new();
+        let library = f.library();
+        let mut entry = library.register(&f.book()).unwrap();
+        library.remove(&[entry.id]).unwrap();
+        entry.path = r"Z:\mangafolio-missing\pages".into();
+        let mut backup = LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 1,
+            books: vec![entry.clone()],
+        };
+        library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .unwrap();
+        backup.books[0].path = r"\\?\Z:\mangafolio-missing\pages".into();
+        assert_eq!(
+            library
+                .restore_json(&serde_json::to_vec(&backup).unwrap())
+                .unwrap()
+                .skipped,
+            1
+        );
+        backup.books.push(entry);
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(
+            source_key(r"\\?\UNC\server\share\pages"),
+            source_key(r"\\server\share\pages")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_normal_restore_then_verbatim_open_keeps_id() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        library.favorite(entry.id, true).unwrap();
+        library
+            .save_progress(entry.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        let mut backup: LibraryBackup =
+            serde_json::from_slice(&library.backup_json().unwrap()).unwrap();
+        backup.books[0].path = source_key(&entry.path);
+        library.remove(&[entry.id]).unwrap();
+        library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .unwrap();
+        let restored = library.list().unwrap().pop().unwrap();
+        let reopened = library.register(&f.book()).unwrap();
+        assert_eq!(restored.id, reopened.id);
+        assert!(reopened.favorite);
+        assert_eq!(reopened.last_index, 1);
+        assert_eq!(library.list().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn archive_titles_reimport_preserves_state_and_folder_dots() {
+        use std::io::Write;
+        let f = Fixture::new();
+        let library = f.library();
+        for extension in ["zip", "cbz"] {
+            let path = f.0.join(format!("Volume.01.{extension}"));
+            let mut archive = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+            for name in ["1.png", "2.png"] {
+                archive
+                    .start_file(name, zip::write::SimpleFileOptions::default())
+                    .unwrap();
+                archive
+                    .write_all(&std::fs::read(f.0.join("pages").join(name)).unwrap())
+                    .unwrap();
+            }
+            archive.finish().unwrap();
+            let opened = book::open(path.to_str().unwrap()).unwrap().book;
+            assert_eq!(opened.title, "Volume.01");
+            let entry = library.register(&opened).unwrap();
+            let prefs = ReaderPreferences {
+                direction: "ltr".into(),
+                ..Default::default()
+            };
+            library.favorite(entry.id, true).unwrap();
+            library.save_progress(entry.id, 1, "2.png", &prefs).unwrap();
+            let updated = library.register(&opened).unwrap();
+            assert_eq!(entry.id, updated.id);
+            assert!(updated.favorite);
+            assert_eq!(updated.last_index, 1);
+            assert_eq!(updated.preferences, prefs);
+        }
+        std::fs::rename(f.0.join("pages"), f.0.join("Folder.01")).unwrap();
+        for path in [f.0.join("Folder.01"), f.0.join("Folder.01/1.png")] {
+            assert_eq!(
+                book::open(path.to_str().unwrap()).unwrap().book.title,
+                "Folder.01"
+            );
         }
     }
 
