@@ -11,10 +11,25 @@ export interface ReaderPreferences {
   transition: "book" | "none" | "slide" | "fade";
 }
 
-export interface LibraryBook {
+export type ReadingStatus = "unread" | "reading" | "read";
+export interface Tag {
+  id: number;
+  name: string;
+}
+export interface BookDetails {
+  customTitle: string;
+  series: string;
+  volume: string;
+  notes: string;
+}
+export interface LibraryBook extends BookDetails {
   id: number;
   path: string;
   title: string;
+  sourceTitle: string;
+  readingStatus: ReadingStatus;
+  statusManual: boolean;
+  tags: Tag[];
   format: "folder" | "cbz";
   pageCount: number;
   favorite: boolean;
@@ -59,3 +74,22 @@ export async function pickBookFiles(): Promise<string[] | null> {
     filters: [{ name: "漫畫壓縮檔", extensions: ["zip", "cbz"] }],
   }) as Promise<string[] | null>;
 }
+
+export const importBookResult = (path: string) =>
+  invoke<{ book: LibraryBook; kind: "added" | "updated" }>(
+    "import_book_result",
+    { path },
+  );
+export const editBook = (id: number, details: BookDetails) =>
+  invoke<LibraryBook>("edit_library_book", { id, details });
+export const setReadingStatus = (
+  ids: number[],
+  status: ReadingStatus | "auto",
+) => invoke<void>("set_reading_status", { ids, status });
+export const listTags = () => invoke<Tag[]>("list_tags");
+export const createTag = (name: string) => invoke<Tag>("create_tag", { name });
+export const renameTag = (id: number, name: string) =>
+  invoke<void>("rename_tag", { id, name });
+export const deleteTag = (id: number) => invoke<void>("delete_tag", { id });
+export const assignTag = (ids: number[], tagId: number, add: boolean) =>
+  invoke<void>("assign_book_tag", { ids, tagId, add });

@@ -49,3 +49,14 @@
 ## 待續工作（更新）
 
 獨立審查、Windows 與安裝包驗收、安全審查、原生備份全流程驗收及下一輪管理擴充尚未完成。優先順序見 [交接](handoff.md#下一位接手者的優先事項)。
+
+## 2026-10-03 UTC：書庫管理與可切換介面
+
+- 核對遠端基準 bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8，從原功能分支建立 feature/library-management-ui 及隔離 worktree，原工作區修改保留；A／R1／R2 及回歸保留。
+- 實際啟動 Chromium mock 與 Linux Tauri 隔離測試，擷取現況後提供三張設計示意；使用者選定全三種並要求未來容易增減改色。
+- 完成 F1–F6：手動／自動閱讀狀態、多標籤、自訂資訊、逐項匯入取消／重試、失效來源管理、schema／備份 v2 及 v1 相容／交易回滾。
+- 完成 U3–U8：三種風格及三種共用檢視、獨立明暗／密度／封面尺寸設定、localStorage 容錯、響應式導覽、狀態／結果與自願教學。外觀 registry 和語意 token 集中，不下載外部主題或執行 CSS。
+- 本次 npm 15 項、Rust34 項、build、diff-check 通過；18 外觀組合、管理 smoke、36 色對、10000 資料與封面佇列驗證。完整輸出見 next-phase-results/final/ 與 ui/。
+- Linux 原生資訊編輯、續讀／返回及三種風格畫面；全部資料與來源在 /tmp/mangafolio-next-phase-native/，未碰使用者實際資料庫。
+- Windows cfg／native、原生選檔全矩陣、原生 IME／高 DPI／螢幕閱讀器及 UNC 效能未執行，清楚交辦。未合併 main／force push／發版。
+- 最終產品與文件提交 SHA 於產品提交後由獨立文件提交固定於 next-phase-review-assignment.md；交付材料包括實際程式、原審查、計畫／驗證／審查交辦及畫面證據。

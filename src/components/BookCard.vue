@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { loadCover } from "../api/covers";
+import { progressPercent, statusLabels } from "../lib/library";
 import type { LibraryBook } from "../api/library";
 
 const props = defineProps<{
@@ -9,11 +10,13 @@ const props = defineProps<{
   favoritePending: boolean;
   selectable?: boolean;
   selected?: boolean;
+  view?: "grid" | "detail" | "compact";
 }>();
 const emit = defineEmits<{
   open: [id: number];
   favorite: [book: LibraryBook];
   select: [id: number];
+  edit: [book: LibraryBook];
 }>();
 const element = ref<HTMLElement | null>(null);
 const cover = ref<string | null>(null);
@@ -53,7 +56,7 @@ onUnmounted(() => {
   <article
     ref="element"
     class="book-card"
-    :class="{ offline: !book.available }"
+    :class="[view ?? 'grid', { offline: !book.available, picked: selected }]"
   >
     <label v-if="selectable" class="selection">
       <input
@@ -73,8 +76,7 @@ onUnmounted(() => {
     >
       <img v-if="cover" :src="cover" alt="" />
       <div v-else class="placeholder">
-        <span aria-hidden="true">漫</span
-        ><small>{{
+        <small>{{
           !book.available
             ? "來源離線"
             : coverFailed
@@ -96,10 +98,23 @@ onUnmounted(() => {
         :disabled="favoritePending"
         @click="emit('favorite', book)"
       >
-        {{ book.favorite ? "★" : "☆" }}
+        {{ book.favorite ? "已收藏" : "收藏" }}
       </button>
+      <p class="metadata">
+        {{ book.series || "未設定系列"
+        }}<span v-if="book.volume"> · 第 {{ book.volume }} 集</span>
+      </p>
+      <p v-if="book.tags.length" class="tags">
+        <span v-for="tag in book.tags" :key="tag.id">{{ tag.name }}</span>
+      </p>
+      <p class="reading-state">
+        {{ statusLabels[book.readingStatus]
+        }}{{ book.statusManual ? " · 手動標記" : "" }} ·
+        {{ progressPercent(book) }}%
+      </p>
       <p v-if="!book.available" class="offline-hint">
-        找不到原始檔案，收藏與進度已保留
+        來源無法存取 · 收藏與進度已保留
+        <span class="source-path">{{ book.path }}</span>
       </p>
       <p v-else>
         {{
@@ -120,6 +135,14 @@ onUnmounted(() => {
           }"
         ></span>
       </div>
+      <button
+        class="edit"
+        :disabled="opening"
+        :aria-label="`編輯資訊：${book.title}`"
+        @click="emit('edit', book)"
+      >
+        編輯資訊
+      </button>
     </div>
   </article>
 </template>
@@ -141,7 +164,7 @@ onUnmounted(() => {
   min-width: 0;
   background: var(--bg-soft);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .cover {
@@ -151,7 +174,7 @@ onUnmounted(() => {
   aspect-ratio: 3 / 4;
   border: 0;
   padding: 0;
-  background: #101318;
+  background: var(--cover-bg);
   cursor: pointer;
 }
 .cover:disabled {
@@ -185,7 +208,7 @@ onUnmounted(() => {
   left: 10px;
   bottom: 10px;
   border-radius: 4px;
-  background: #14171ce6;
+  background: var(--panel);
   color: var(--text);
   padding: 4px 6px;
   font-size: 10px;
@@ -197,7 +220,7 @@ onUnmounted(() => {
 h2 {
   font-size: 14px;
   font-weight: 600;
-  padding-right: 28px;
+  padding-right: 70px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -211,12 +234,12 @@ p {
   position: absolute;
   top: 7px;
   right: 7px;
-  width: 36px;
+  width: 66px;
   height: 36px;
   background: transparent;
   border: 0;
   color: var(--text-dim);
-  font-size: 23px;
+  font-size: 12px;
   cursor: pointer;
 }
 .favorite.selected {
@@ -234,10 +257,182 @@ p {
   height: 100%;
   background: var(--accent);
 }
-.offline .cover {
+.offline .cover img {
   opacity: 0.65;
 }
 .offline-hint {
   line-height: 1.6;
+}
+
+.detail .details {
+  display: grid;
+  grid-template-columns: minmax(160px, 2fr) minmax(140px, 1fr) minmax(
+      140px,
+      1fr
+    );
+  gap: 8px;
+  align-items: start;
+}
+.detail h2 {
+  padding-right: 0;
+}
+.detail .favorite {
+  position: static;
+  justify-self: end;
+  grid-column: 3;
+  grid-row: 1;
+}
+.detail .tags {
+  grid-column: 2;
+}
+.detail .reading-state {
+  grid-column: 3;
+}
+.detail .offline-hint {
+  grid-column: 1 / -1;
+}
+.detail .edit {
+  justify-self: start;
+}
+.detail p {
+  margin-top: 0;
+}
+.picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tags span {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.source-path {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.edit {
+  margin-top: 10px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.reading-state {
+  color: var(--accent-soft);
+}
+.detail,
+.compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  padding: 12px;
+}
+.detail .cover {
+  width: 76px;
+  flex: 0 0 76px;
+}
+.compact .cover {
+  width: 42px;
+  flex: 0 0 42px;
+}
+.detail .details,
+.compact .details {
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+}
+.detail .format,
+.compact .format {
+  display: none;
+}
+.compact .details {
+  display: grid;
+  grid-template-columns: minmax(120px, 2fr) minmax(100px, 1fr) minmax(
+      110px,
+      1fr
+    ) 70px;
+  gap: 8px;
+  align-items: center;
+}
+.compact h2 {
+  padding-right: 0;
+  grid-column: 1;
+  grid-row: 1;
+}
+.compact .metadata {
+  grid-column: 2;
+  grid-row: 1;
+}
+.compact .reading-state {
+  grid-column: 3;
+  grid-row: 1;
+}
+.compact .tags {
+  grid-column: 1 / 4;
+  grid-row: 2;
+}
+.compact .favorite {
+  position: static;
+  grid-column: 4;
+  grid-row: 1;
+}
+.compact .edit {
+  margin: 0;
+  grid-column: 4;
+  grid-row: 2;
+}
+.compact .metadata,
+.compact .tags,
+.compact .reading-state {
+  margin: 0;
+}
+.compact .progress,
+.compact
+  .details
+  > p:not(.metadata):not(.tags):not(.reading-state):not(.offline-hint) {
+  display: none;
+}
+.compact .offline-hint {
+  grid-column: 1 / -1;
+}
+.compact .selection {
+  padding: 0;
+}
+@media (max-width: 1000px) {
+  .detail .details {
+    display: block;
+  }
+  .detail h2 {
+    padding-right: 70px;
+  }
+  .detail .favorite {
+    position: absolute;
+  }
+  .detail p {
+    margin-top: 6px;
+  }
+}
+@media (max-width: 700px) {
+  .compact .details {
+    display: block;
+  }
+  .compact .favorite {
+    position: absolute;
+  }
+  .compact h2 {
+    padding-right: 70px;
+  }
+  .compact .metadata,
+  .compact .tags,
+  .compact .reading-state {
+    margin-top: 6px;
+  }
 }
 </style>

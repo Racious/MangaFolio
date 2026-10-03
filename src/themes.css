@@ -1,0 +1,136 @@
+/* Theme tokens are the only palette/layout variation point. Components consume semantic tokens.
+   Adding a style: register its name in lib/appearance.ts and add light/dark token overrides here. */
+:root {
+  --bg: #f7f5ef;
+  --bg-soft: #efeee6;
+  --panel: #ffffff;
+  --border: #818e84;
+  --text: #24372f;
+  --text-dim: #54675e;
+  --accent: #36664f;
+  --accent-soft: #36664f;
+  --accent-ink: #ffffff;
+  --red: #aa313c;
+  --cover-bg: #e8ebe5;
+  --radius: 14px;
+  --space: 20px;
+  --content-padding: 32px;
+  --sidebar-width: 220px;
+  --cover-min: 170px;
+  color-scheme: light;
+}
+:root[data-style="catalog"] {
+  --bg: #f4f6fa;
+  --bg-soft: #eaf0f7;
+  --border: #8292a7;
+  --text: #24344e;
+  --text-dim: #52647e;
+  --accent: #325e9e;
+  --accent-soft: #325e9e;
+  --cover-bg: #e6ebf3;
+  --radius: 6px;
+}
+:root[data-style="night"] {
+  --bg: #faf6ed;
+  --bg-soft: #efe8da;
+  --border: #9c8b70;
+  --text: #3c3326;
+  --text-dim: #6e604d;
+  --accent: #805b24;
+  --accent-soft: #805b24;
+  --cover-bg: #e8e0d0;
+  --radius: 10px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #17221e;
+  --bg-soft: #1f2d26;
+  --panel: #26362e;
+  --border: #7c9184;
+  --text: #e4ece6;
+  --text-dim: #adbeb2;
+  --accent: #a4cfaf;
+  --accent-soft: #b2dfbf;
+  --accent-ink: #183123;
+  --red: #ffadb4;
+  --cover-bg: #111914;
+}
+:root[data-style="catalog"][data-theme="dark"] {
+  --bg: #17202e;
+  --bg-soft: #202c3d;
+  --panel: #263449;
+  --border: #7e96b2;
+  --text: #e5edf8;
+  --text-dim: #adbed5;
+  --accent: #a3c7fc;
+  --accent-soft: #b4d2ff;
+  --accent-ink: #162e50;
+  --cover-bg: #111927;
+}
+:root[data-style="night"][data-theme="dark"] {
+  --bg: #191b20;
+  --bg-soft: #23262c;
+  --panel: #2a2e35;
+  --border: #928b7e;
+  --text: #ece8df;
+  --text-dim: #bdb6aa;
+  --accent: #d4b57a;
+  --accent-soft: #e2c58c;
+  --accent-ink: #2c2416;
+  --cover-bg: #111318;
+}
+:root[data-density="compact"] {
+  --space: 12px;
+  --content-padding: 22px;
+}
+:root[data-cover-size="small"] {
+  --cover-min: 135px;
+}
+:root[data-cover-size="large"] {
+  --cover-min: 220px;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+button,
+select,
+input,
+textarea {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) / 2);
+  padding: 9px 12px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+summary:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 1;
+}

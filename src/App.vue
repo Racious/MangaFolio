@@ -8,11 +8,21 @@ import PageScrubber from "./components/PageScrubber.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
 import { useLibraryStore } from "./stores/library";
 import { useReaderStore } from "./stores/reader";
+import { useAppearanceStore } from "./stores/appearance";
 import { useUpdateStore } from "./stores/update";
 
 const library = useLibraryStore();
 const reader = useReaderStore();
 const update = useUpdateStore();
+const appearance = useAppearanceStore();
+appearance.load();
+const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+const applyAppearance = () => appearance.apply(systemTheme.matches);
+watch(() => appearance.settings, applyAppearance, {
+  deep: true,
+  immediate: true,
+});
+systemTheme.addEventListener("change", applyAppearance);
 let unlistenClose: (() => void) | undefined;
 let disposed = false;
 let closing = false;
@@ -51,7 +61,7 @@ onMounted(async () => {
     const window = getCurrentWindow();
     const unlisten = await window.onCloseRequested(async (event) => {
       event.preventDefault();
-      if (library.managing) {
+      if (library.managing || library.importing) {
         library.error = "書庫操作進行中，請完成後再關閉視窗。";
         return;
       }
@@ -73,6 +83,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   disposed = true;
+  systemTheme.removeEventListener("change", applyAppearance);
   unlistenClose?.();
 });
 </script>

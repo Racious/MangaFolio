@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import {
   exportBackup,
+  setReadingStatus,
+  assignTag,
   favoriteBooks,
   relinkBook,
   removeBooks,
@@ -16,6 +18,23 @@ const props = defineProps<{ selectedIds: number[]; shownCount: number }>();
 const emit = defineEmits<{ clear: []; selectShown: [] }>();
 const library = useLibraryStore();
 const reader = useReaderStore();
+const tagId = ref<number | null>(null);
+async function status(status: "read" | "unread" | "auto") {
+  await run(async (ids) => {
+    if (!ids.length) return;
+    await setReadingStatus(ids, status);
+    await library.refresh();
+    library.importNotice = "閱讀狀態已更新，續讀位置保持不變。";
+  });
+}
+async function tag(add: boolean) {
+  await run(async (ids) => {
+    if (!ids.length || tagId.value === null) return;
+    await assignTag(ids, tagId.value, add);
+    await library.refresh();
+    library.importNotice = "書籍標籤已更新。";
+  });
+}
 const busy = computed(
   () =>
     library.managing ||
@@ -115,7 +134,7 @@ async function backup() {
     if (!path) return;
     await exportBackup(path);
     library.importNotice =
-      "備份已匯出：包含來源路徑、收藏、進度與閱讀設定。漫畫檔案需另外備份。";
+      "備份已匯出：包含來源路徑、收藏、進度、閱讀狀態、標籤、自訂資訊與閱讀設定。漫畫檔案需另外備份。";
   });
 }
 async function restore() {
@@ -190,12 +209,44 @@ async function restore() {
       </button>
     </div>
     <div class="actions">
-      <button :disabled="busy" @click="backup">匯出書庫備份</button>
-      <button :disabled="busy" @click="restore">還原書庫備份</button>
+      <button :disabled="busy || !selectedIds.length" @click="status('read')">
+        標記已讀
+      </button>
+      <button :disabled="busy || !selectedIds.length" @click="status('unread')">
+        標記未讀
+      </button>
+      <button :disabled="busy || !selectedIds.length" @click="status('auto')">
+        依進度判定
+      </button>
+      <select v-model="tagId" aria-label="批次標籤" :disabled="busy">
+        <option :value="null">選擇標籤</option>
+        <option v-for="item in library.tags" :key="item.id" :value="item.id">
+          {{ item.name }}
+        </option>
+      </select>
+      <button
+        :disabled="busy || !selectedIds.length || tagId === null"
+        @click="tag(true)"
+      >
+        批次加入標籤
+      </button>
+      <button
+        :disabled="busy || !selectedIds.length || tagId === null"
+        @click="tag(false)"
+      >
+        批次移除標籤
+      </button>
     </div>
-    <p>
-      備份只含書庫資料，不含漫畫、封面或教學狀態。還原採合併，既有來源不覆寫；匯出請使用新檔名。
-    </p>
+    <details>
+      <summary>備份與還原</summary>
+      <div class="actions">
+        <button :disabled="busy" @click="backup">匯出書庫備份</button>
+        <button :disabled="busy" @click="restore">還原書庫備份</button>
+      </div>
+      <p>
+        備份只含書庫資料，不含漫畫、封面或教學狀態。還原採合併，既有來源不覆寫；匯出請使用新檔名。
+      </p>
+    </details>
     <p v-if="library.managing" role="status">正在處理書庫，請稍候…</p>
   </section>
 </template>
@@ -203,10 +254,10 @@ async function restore() {
 <style scoped>
 .manager {
   padding: 18px 20px;
-  margin-bottom: 24px;
+  margin-bottom: var(--space);
   background: var(--bg-soft);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 h2 {
   font-size: 16px;
@@ -241,5 +292,10 @@ button {
 button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+summary {
+  margin-top: 12px;
+  cursor: pointer;
+  font-size: 13px;
 }
 </style>

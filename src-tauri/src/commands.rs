@@ -125,7 +125,7 @@ fn open_source(
         session_id,
         favorite: saved.favorite,
         preferences: saved.preferences,
-        title: result.book.title.clone(),
+        title: saved.title,
         page_count: result.book.len(),
         pages,
         start_index,

@@ -36,6 +36,14 @@ pub fn run() {
             library::favorite_library_books,
             library::relink_library_book,
             library::export_library_backup,
+            library::import_book_result,
+            library::edit_library_book,
+            library::set_reading_status,
+            library::list_tags,
+            library::create_tag,
+            library::rename_tag,
+            library::delete_tag,
+            library::assign_book_tag,
             library::restore_library_backup
         ])
         .run(tauri::generate_context!())

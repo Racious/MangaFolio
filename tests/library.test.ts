@@ -12,6 +12,14 @@ function book(
   return {
     id,
     title,
+    sourceTitle: title,
+    customTitle: "",
+    series: "",
+    volume: "",
+    notes: "",
+    tags: [],
+    readingStatus: lastReadAt === null ? "unread" : "reading",
+    statusManual: false,
     favorite,
     lastReadAt,
     path: `/books/${id}`,
@@ -88,5 +96,52 @@ test("full-width b searches titles without matching archive path extensions", ()
   const books = [book(1, "海邊故事"), book(2, "Blue Stories")];
   books[0].path = "/books/海邊故事.cbz";
   books[1].path = "/books/Blue Stories.cbz";
-  assert.deepEqual(filterBooks(books, "ｂ", "all").map(b => b.id), [2]);
+  assert.deepEqual(
+    filterBooks(books, "ｂ", "all").map((b) => b.id),
+    [2],
+  );
+});
+
+test("status, missing-source, favorites, tags and metadata search compose without resetting", () => {
+  const a = book(1, "自訂標題", true, 10),
+    b = book(2, "其他");
+  a.sourceTitle = "原始檔名";
+  a.series = "系列１０";
+  a.volume = "外傳";
+  a.notes = "重要備註";
+  a.tags = [{ id: 4, name: "日常" }];
+  a.readingStatus = "read";
+  a.available = false;
+  for (const query of ["自訂", "原始", "系列10", "外傳", "備註", "日常"]) {
+    assert.deepEqual(
+      filterBooks([a, b], query, "favorites", "read", 4).map((b) => b.id),
+      [1],
+    );
+  }
+  assert.equal(filterBooks([a, b], "", "missing", "read", 4).length, 1);
+  assert.equal(filterBooks([a, b], "", "favorites", "unread", 4).length, 0);
+  b.series = "系列2";
+  assert.deepEqual(
+    sortBooks([a, b], "series").map((b) => b.id),
+    [2, 1],
+  );
+});
+
+test("large library filtering and sorting keep a stable source array", () => {
+  const books = Array.from({ length: 10000 }, (_, i) => {
+    const b = book(i + 1, `漫畫第${i + 1}卷`, i % 2 === 0);
+    b.tags = [{ id: i % 4, name: "分類" }];
+    b.readingStatus = i % 3 === 0 ? "read" : "unread";
+    return b;
+  });
+  const filtered = filterBooks(books, "第1", "favorites", "read", 0);
+  assert.ok(filtered.length > 0);
+  assert.ok(
+    filtered.every(
+      (b) => b.favorite && b.readingStatus === "read" && b.tags[0].id === 0,
+    ),
+  );
+  assert.equal(books[0].id, 1);
+  assert.equal(books.at(-1)?.id, 10000);
+  assert.equal(sortBooks(books, "title")[9].id, 10);
 });

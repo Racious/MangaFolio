@@ -8,6 +8,12 @@ use serde::{Deserialize, Serialize};
 use tauri::{ipc::Response, State};
 
 use crate::{book, image_pipeline};
+#[path = "library_metadata.rs"]
+mod metadata;
+pub use metadata::*;
+fn default_status() -> String {
+    "unread".into()
+}
 
 pub struct Library {
     connection: Mutex<Connection>,
@@ -68,9 +74,25 @@ pub struct LibraryBook {
     pub last_read_at: Option<i64>,
     pub preferences: ReaderPreferences,
     pub available: bool,
+    #[serde(default)]
+    pub source_title: String,
+    #[serde(default)]
+    pub custom_title: String,
+    #[serde(default)]
+    pub series: String,
+    #[serde(default)]
+    pub volume: String,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default = "default_status")]
+    pub reading_status: String,
+    #[serde(default)]
+    pub status_manual: bool,
+    #[serde(default)]
+    pub tags: Vec<Tag>,
 }
 
-const COLUMNS: &str = "id, path, title, format, page_count, favorite, last_index, last_page_name, last_read_at, preferences";
+const COLUMNS: &str = "id, path, title, format, page_count, favorite, last_index, last_page_name, last_read_at, preferences, custom_title, series, volume, notes, reading_status, status_manual, COALESCE((SELECT json_group_array(json_object('id',tags.id,'name',tags.name)) FROM tags JOIN book_tags ON tags.id=book_tags.tag_id WHERE book_tags.book_id=books.id),'[]')";
 fn db_error(e: impl std::fmt::Display) -> String {
     format!("書庫資料操作失敗：{e}")
 }
@@ -88,11 +110,29 @@ fn row_book(row: &rusqlite::Row<'_>) -> rusqlite::Result<LibraryBook> {
     })?;
     let page_count: usize = row.get(4)?;
     let last_index: usize = row.get(6)?;
+    let source_title: String = row.get(2)?;
+    let custom_title: String = row.get(10)?;
+    let tags: String = row.get(16)?;
+    let tags = serde_json::from_str(&tags).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(16, rusqlite::types::Type::Text, Box::new(e))
+    })?;
     Ok(LibraryBook {
         id: row.get(0)?,
         available: Path::new(&path).exists(),
         path,
-        title: row.get(2)?,
+        title: if custom_title.is_empty() {
+            source_title.clone()
+        } else {
+            custom_title.clone()
+        },
+        source_title,
+        custom_title,
+        series: row.get(11)?,
+        volume: row.get(12)?,
+        notes: row.get(13)?,
+        reading_status: row.get(14)?,
+        status_manual: row.get(15)?,
+        tags,
         format: row.get(3)?,
         page_count,
         favorite: row.get(5)?,
@@ -171,17 +211,22 @@ fn source_id(
 impl Library {
     pub fn open(directory: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(directory).map_err(db_error)?;
-        let connection = Connection::open(directory.join("library.sqlite3")).map_err(db_error)?;
+        let mut connection =
+            Connection::open(directory.join("library.sqlite3")).map_err(db_error)?;
         connection
             .busy_timeout(Duration::from_secs(5))
             .map_err(db_error)?;
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_error)?;
-        if version > 1 {
+        if version > 2 {
             return Err("書庫來自較新版本，請更新 MangaFolio；原始資料已保留。".into());
         }
-        connection.execute_batch("PRAGMA journal_mode=WAL;
+        connection
+            .execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")
+            .map_err(db_error)?;
+        if version == 0 {
+            connection.execute_batch("
             BEGIN IMMEDIATE;
             CREATE TABLE IF NOT EXISTS books (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,6 +238,10 @@ impl Library {
             CREATE INDEX IF NOT EXISTS books_recent ON books(last_read_at DESC);
             PRAGMA user_version=1;
             COMMIT;").map_err(db_error)?;
+        }
+        if version < 2 {
+            metadata::migrate(&mut connection)?;
+        }
         let covers = directory.join("covers");
         std::fs::create_dir_all(&covers).map_err(db_error)?;
         Ok(Self {
@@ -235,6 +284,14 @@ impl Library {
         book: &book::Book,
         selected: Option<i64>,
     ) -> Result<LibraryBook, String> {
+        self.register_outcome(book, selected).map(|(book, _)| book)
+    }
+
+    pub(crate) fn register_outcome(
+        &self,
+        book: &book::Book,
+        selected: Option<i64>,
+    ) -> Result<(LibraryBook, bool), String> {
         let path = book
             .source_path()
             .canonicalize()
@@ -286,7 +343,7 @@ impl Library {
                 )
                 .map_err(db_error)?;
             connection.commit().map_err(db_error)?;
-            return Ok(updated);
+            return Ok((updated, false));
         }
         connection.execute("INSERT INTO books(path,title,format,page_count,preferences,created_at)
             VALUES(?1,?2,?3,?4,?5,?6)
@@ -300,7 +357,7 @@ impl Library {
             )
             .map_err(db_error)?;
         connection.commit().map_err(db_error)?;
-        Ok(updated)
+        Ok((updated, matched.is_none()))
     }
 
     pub fn mark_opened(&self, id: i64) -> Result<(), String> {
@@ -330,7 +387,9 @@ impl Library {
             .map_err(db_error)?
             .execute(
                 "UPDATE books SET last_index=?1,last_page_name=?2,
-            last_read_at=?3,preferences=?4 WHERE id=?5 AND page_count>?1",
+            last_read_at=?3,preferences=?4,
+            reading_status=CASE WHEN status_manual=1 THEN reading_status WHEN ?1>=page_count-1 THEN 'read' ELSE 'reading' END
+            WHERE id=?5 AND page_count>?1",
                 params![index, page_name, now(), preferences, id],
             )
             .map_err(db_error)?;
@@ -409,6 +468,8 @@ impl Library {
 pub struct LibraryBackup {
     pub application: String,
     pub version: u32,
+    #[serde(default)]
+    pub tags: Vec<Tag>,
     pub books: Vec<LibraryBook>,
 }
 
@@ -503,19 +564,32 @@ impl Library {
     }
 
     pub fn backup_json(&self) -> Result<Vec<u8>, String> {
-        let books = self.list()?;
+        let mut guard = self.connection.lock().map_err(db_error)?;
+        let connection = guard.transaction().map_err(db_error)?;
+        let books = {
+            let mut query = connection
+                .prepare(&format!(
+                    "SELECT {COLUMNS} FROM books ORDER BY last_read_at DESC,id DESC"
+                ))
+                .map_err(db_error)?;
+            let rows = query.query_map([], row_book).map_err(db_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(db_error)?
+        };
+        let tags = metadata::tags_from_connection(&connection)?;
         if books.len() > MAX_BACKUP_BOOKS {
             return Err("備份最多支援 10,000 本書。".into());
         }
         let bytes = serde_json::to_vec_pretty(&LibraryBackup {
             application: "MangaFolio".into(),
-            version: 1,
+            version: 2,
+            tags,
             books,
         })
         .map_err(db_error)?;
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
             return Err("備份超過 16 MiB，無法匯出。".into());
         }
+        connection.commit().map_err(db_error)?;
         Ok(bytes)
     }
 
@@ -540,16 +614,79 @@ impl Library {
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
             return Err("備份超過 16 MiB。".into());
         }
-        let backup: LibraryBackup =
+        // Read the version before strict payload parsing so future fields still
+        // yield an explicit version error rather than a generic format error.
+        #[derive(Deserialize)]
+        struct BackupHeader {
+            version: u64,
+        }
+        let header: BackupHeader =
+            serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
+        if header.version > 2 {
+            return Err("不支援較新的備份版本，未還原任何項目。".into());
+        }
+        let mut backup: LibraryBackup =
             serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
         if backup.application != "MangaFolio"
-            || backup.version != 1
+            || ![1, 2].contains(&backup.version)
             || backup.books.len() > MAX_BACKUP_BOOKS
         {
             return Err("不支援的備份格式、版本或書籍數量。".into());
         }
+        if backup.version == 1 {
+            backup.tags.clear();
+        }
+        if backup.tags.len() > 1000 {
+            return Err("備份標籤過多。".into());
+        }
+        let mut tag_names = std::collections::HashSet::new();
+        for tag in &backup.tags {
+            if !tag_names.insert(metadata::tag_key(&tag.name)?) {
+                return Err("備份標籤重複。".into());
+            }
+        }
         let mut paths = std::collections::HashSet::new();
-        for book in &backup.books {
+        for book in &mut backup.books {
+            if backup.version == 1 {
+                book.source_title = book.title.clone();
+                book.custom_title.clear();
+                book.series.clear();
+                book.volume.clear();
+                book.notes.clear();
+                book.tags.clear();
+                book.status_manual = false;
+                book.reading_status = if book.last_read_at.is_none() {
+                    "unread"
+                } else if book.last_index >= book.page_count.saturating_sub(1) {
+                    "read"
+                } else {
+                    "reading"
+                }
+                .into();
+            } else {
+                metadata::BookDetails {
+                    custom_title: book.custom_title.clone(),
+                    series: book.series.clone(),
+                    volume: book.volume.clone(),
+                    notes: book.notes.clone(),
+                }
+                .validate()?;
+                metadata::valid_status(&book.reading_status)?;
+                if book.source_title.is_empty() {
+                    return Err("備份缺少來源名稱。".into());
+                }
+                metadata::valid_text(&book.source_title, 4096)?;
+                if book.tags.len() > 100 {
+                    return Err("備份書籍標籤過多。".into());
+                }
+                let mut assigned = std::collections::HashSet::new();
+                for tag in &book.tags {
+                    let key = metadata::tag_key(&tag.name)?;
+                    if !tag_names.contains(&key) || !assigned.insert(key) {
+                        return Err("備份含未知或重複標籤關聯。".into());
+                    }
+                }
+            }
             book.preferences.validate()?;
             let path = book.path.as_bytes();
             let absolute = Path::new(&book.path).is_absolute()
@@ -579,6 +716,23 @@ impl Library {
         }
         let mut connection = self.connection.lock().map_err(db_error)?;
         let transaction = connection.transaction().map_err(db_error)?;
+        let mut tag_ids = std::collections::HashMap::new();
+        for tag in backup.tags {
+            let key = metadata::tag_key(&tag.name)?;
+            transaction.execute("INSERT INTO tags(name,name_key) VALUES(?1,?2) ON CONFLICT(name_key) DO NOTHING",params![tag.name.trim(),key]).map_err(db_error)?;
+            let id: i64 = transaction
+                .query_row("SELECT id FROM tags WHERE name_key=?1", [&key], |r| {
+                    r.get(0)
+                })
+                .map_err(db_error)?;
+            tag_ids.insert(key, id);
+        }
+        let count: i64 = transaction
+            .query_row("SELECT COUNT(*) FROM tags", [], |r| r.get(0))
+            .map_err(db_error)?;
+        if count > 1000 {
+            return Err("合併後標籤超過 1000，未還原任何項目。".into());
+        }
         let mut result = RestoreResult {
             added: 0,
             skipped: 0,
@@ -606,8 +760,19 @@ impl Library {
             existing_keys.insert(key);
             // New IDs are generated; existing sources keep their current metadata.
             let preferences = serde_json::to_string(&book.preferences).map_err(db_error)?;
-            let added = transaction.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(path) DO NOTHING", params![book.path, book.title, book.format, book.page_count, book.favorite, book.last_index, book.last_page_name, book.last_read_at, preferences, now()]).map_err(db_error)?;
+            let added = transaction.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(path) DO NOTHING", params![book.path, book.source_title, book.format, book.page_count, book.favorite, book.last_index, book.last_page_name, book.last_read_at, preferences, now()]).map_err(db_error)?;
             if added == 1 {
+                let id = transaction.last_insert_rowid();
+                transaction.execute("UPDATE books SET custom_title=?1,series=?2,volume=?3,notes=?4,reading_status=?5,status_manual=?6 WHERE id=?7",params![book.custom_title.trim(),book.series.trim(),book.volume.trim(),book.notes,book.reading_status,book.status_manual,id]).map_err(db_error)?;
+                for tag in book.tags {
+                    let key = metadata::tag_key(&tag.name)?;
+                    transaction
+                        .execute(
+                            "INSERT INTO book_tags(book_id,tag_id) VALUES(?1,?2)",
+                            params![id, tag_ids[&key]],
+                        )
+                        .map_err(db_error)?;
+                }
                 result.added += 1;
             } else {
                 result.skipped += 1;
@@ -780,6 +945,309 @@ mod tests {
     }
 
     #[test]
+    fn large_offline_library_restores_checks_sources_and_exports() {
+        let f = Fixture::new();
+        let library = f.library();
+        let template = library.register(&f.book()).unwrap();
+        let books = (0..9_999)
+            .map(|i| {
+                let mut book = template.clone();
+                book.path =
+                    f.0.join(format!("offline-{i}.cbz"))
+                        .to_string_lossy()
+                        .into_owned();
+                book.title = format!("Book {i}");
+                book.source_title = book.title.clone();
+                book
+            })
+            .collect();
+        let backup = LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 2,
+            tags: vec![],
+            books,
+        };
+        let started = std::time::Instant::now();
+        assert_eq!(
+            library
+                .restore_json(&serde_json::to_vec(&backup).unwrap())
+                .unwrap()
+                .added,
+            9_999
+        );
+        let listed = library.list().unwrap();
+        assert_eq!(listed.len(), 10_000);
+        assert_eq!(listed.iter().filter(|book| book.available).count(), 1);
+        let exported: LibraryBackup =
+            serde_json::from_slice(&library.backup_json().unwrap()).unwrap();
+        assert_eq!(exported.books.len(), 10_000);
+        eprintln!(
+            "10,000 isolated entries restore/source checks/export: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn failed_v1_migration_rolls_back_columns_and_version() {
+        let f = Fixture::new();
+        let directory = f.0.join("migration-failure");
+        std::fs::create_dir(&directory).unwrap();
+        let conn = Connection::open(directory.join("library.sqlite3")).unwrap();
+        conn.execute_batch("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,path TEXT NOT NULL UNIQUE,title TEXT NOT NULL,format TEXT NOT NULL,page_count INTEGER NOT NULL,favorite INTEGER NOT NULL DEFAULT 0,last_index INTEGER NOT NULL DEFAULT 0,last_page_name TEXT,last_read_at INTEGER,preferences TEXT NOT NULL,created_at INTEGER NOT NULL);CREATE TABLE tags(id INTEGER);PRAGMA user_version=1;").unwrap();
+        assert!(Library::open(&directory).is_err());
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            conn.query_row(
+                "SELECT count(*) FROM pragma_table_info('books') WHERE name='custom_title'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn import_report_distinguishes_added_updated_and_preserves_info() {
+        let f = Fixture::new();
+        let library = f.library();
+        let (first, created) = library.register_outcome(&f.book(), None).unwrap();
+        assert!(created);
+        library
+            .edit_details(
+                first.id,
+                &BookDetails {
+                    custom_title: "保留資訊".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let (second, created) = library.register_outcome(&f.book(), None).unwrap();
+        assert!(!created);
+        assert_eq!(first.id, second.id);
+        assert_eq!(second.title, "保留資訊");
+    }
+
+    #[test]
+    fn v1_database_migrates_without_losing_identity_or_progress() {
+        let f = Fixture::new();
+        let directory = f.0.join("old-data");
+        std::fs::create_dir(&directory).unwrap();
+        let conn = Connection::open(directory.join("library.sqlite3")).unwrap();
+        conn.execute_batch("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,path TEXT NOT NULL UNIQUE,title TEXT NOT NULL,format TEXT NOT NULL,page_count INTEGER NOT NULL,favorite INTEGER NOT NULL DEFAULT 0,last_index INTEGER NOT NULL DEFAULT 0,last_page_name TEXT,last_read_at INTEGER,preferences TEXT NOT NULL,created_at INTEGER NOT NULL); PRAGMA user_version=1;").unwrap();
+        conn.execute("INSERT INTO books(id,path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(42,?1,'legacy','folder',3,1,1,'2.png',123,?2,1)",params![f.0.join("pages").to_string_lossy(),serde_json::to_string(&ReaderPreferences::default()).unwrap()]).unwrap();
+        drop(conn);
+        let library = Library::open(&directory).unwrap();
+        let b = library.get(42).unwrap();
+        assert!(b.favorite);
+        assert_eq!(b.last_index, 1);
+        assert_eq!(b.last_read_at, Some(123));
+        assert_eq!(b.reading_status, "reading");
+        assert!(b.tags.is_empty());
+        assert_eq!(b.source_title, "legacy");
+        assert_eq!(
+            library.register_selected(&f.book(), Some(42)).unwrap().id,
+            42
+        );
+        assert_eq!(
+            library
+                .connection
+                .lock()
+                .unwrap()
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+    }
+
+    #[test]
+    fn manual_status_is_independent_and_batch_failures_are_atomic() {
+        let f = Fixture::new();
+        let library = f.library();
+        let b = library.register(&f.book()).unwrap();
+        assert_eq!(b.reading_status, "unread");
+        library
+            .save_progress(b.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        assert_eq!(library.get(b.id).unwrap().reading_status, "reading");
+        let before = library.get(b.id).unwrap();
+        assert!(library.set_status(&[b.id, b.id + 99], "read").is_err());
+        assert_eq!(library.get(b.id).unwrap().reading_status, "reading");
+        library.set_status(&[b.id], "unread").unwrap();
+        let marked = library.get(b.id).unwrap();
+        assert_eq!(marked.last_index, before.last_index);
+        assert_eq!(marked.last_read_at, before.last_read_at);
+        assert_eq!(marked.preferences, before.preferences);
+        library
+            .save_progress(b.id, 2, "10.png", &ReaderPreferences::default())
+            .unwrap();
+        assert_eq!(library.get(b.id).unwrap().reading_status, "unread");
+        library.set_status(&[b.id], "auto").unwrap();
+        assert_eq!(library.get(b.id).unwrap().reading_status, "read");
+        library.set_status(&[b.id], "read").unwrap();
+        assert_eq!(library.register(&f.book()).unwrap().reading_status, "read");
+    }
+
+    #[test]
+    fn tags_and_custom_info_survive_reimport_relink_and_backup() {
+        let f = Fixture::new();
+        let library = f.library();
+        let b = library.register(&f.book()).unwrap();
+        let details = BookDetails {
+            custom_title: "我的書名".into(),
+            series: "系列10".into(),
+            volume: "外傳".into(),
+            notes: "閱讀備註".into(),
+        };
+        library.edit_details(b.id, &details).unwrap();
+        library.favorite(b.id, true).unwrap();
+        library
+            .save_progress(b.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        library.set_status(&[b.id], "read").unwrap();
+        let tag = library.create_tag("  收藏作品  ").unwrap();
+        let unused = library.create_tag("未使用").unwrap();
+        library.assign_tag(&[b.id], tag.id, true).unwrap();
+        let reimport = library.register(&f.book()).unwrap();
+        assert_eq!(reimport.title, details.custom_title);
+        assert_eq!(reimport.source_title, "pages");
+        assert_eq!(reimport.series, details.series);
+        assert_eq!(reimport.tags[0], tag);
+        assert_eq!(reimport.reading_status, "read");
+        std::fs::rename(f.0.join("pages"), f.0.join("moved")).unwrap();
+        let moved = book::open(f.0.join("moved").to_str().unwrap())
+            .unwrap()
+            .book;
+        let linked = library.relink(b.id, &moved).unwrap();
+        assert_eq!(linked.id, b.id);
+        assert_eq!(linked.title, details.custom_title);
+        assert_eq!(linked.source_title, "moved");
+        assert!(linked.favorite);
+        assert_eq!(linked.last_index, 1);
+        assert_eq!(linked.notes, details.notes);
+        let bytes = library.backup_json().unwrap();
+        library.remove(&[b.id]).unwrap();
+        library.delete_tag(tag.id).unwrap();
+        library.delete_tag(unused.id).unwrap();
+        library.restore_json(&bytes).unwrap();
+        let restored = library.list().unwrap().pop().unwrap();
+        assert_eq!(restored.title, details.custom_title);
+        assert_eq!(restored.tags[0].name, tag.name);
+        assert_eq!(library.tags().unwrap().len(), 2);
+        assert!(restored.status_manual);
+        assert_eq!(restored.reading_status, "read");
+        assert_eq!(restored.preferences, linked.preferences);
+        library
+            .edit_details(
+                restored.id,
+                &BookDetails {
+                    custom_title: "現有資料".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let merge = library.restore_json(&bytes).unwrap();
+        assert_eq!(merge.skipped, 1);
+        assert_eq!(library.get(restored.id).unwrap().title, "現有資料");
+    }
+
+    #[test]
+    fn tag_validation_batches_and_delete_never_delete_sources() {
+        let f = Fixture::new();
+        let other = Fixture::new();
+        let library = f.library();
+        let a = library.register(&f.book()).unwrap();
+        let b = library.register(&other.book()).unwrap();
+        let tag = library.create_tag("Mystery").unwrap();
+        assert!(library.create_tag(" mystery ").is_err());
+        assert!(library.create_tag("  ").is_err());
+        assert!(library.create_tag(&"長".repeat(65)).is_err());
+        assert!(library.create_tag("bad\nname").is_err());
+        let second = library.create_tag("Nature").unwrap();
+        assert!(library.rename_tag(second.id, "MYSTERY").is_err());
+        assert!(library.assign_tag(&[a.id, 999999], tag.id, true).is_err());
+        assert!(library.get(a.id).unwrap().tags.is_empty());
+        library.assign_tag(&[a.id, b.id], tag.id, true).unwrap();
+        library.rename_tag(tag.id, "懸疑").unwrap();
+        assert_eq!(library.get(a.id).unwrap().tags[0].name, "懸疑");
+        library.assign_tag(&[a.id, b.id], tag.id, false).unwrap();
+        assert!(library.get(a.id).unwrap().tags.is_empty());
+        library.assign_tag(&[a.id], tag.id, true).unwrap();
+        library.delete_tag(tag.id).unwrap();
+        assert!(library.get(a.id).unwrap().tags.is_empty());
+        assert!(f.0.join("pages/1.png").exists());
+        assert_eq!(library.list().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn restore_v1_defaults_and_v2_failures_roll_back_catalog_and_books() {
+        let f = Fixture::new();
+        let library = f.library();
+        let b = library.register(&f.book()).unwrap();
+        library
+            .save_progress(b.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        let mut backup: LibraryBackup =
+            serde_json::from_slice(&library.backup_json().unwrap()).unwrap();
+        library.remove(&[b.id]).unwrap();
+        backup.version = 1;
+        let mut legacy = serde_json::to_value(&backup).unwrap();
+        legacy.as_object_mut().unwrap().remove("tags");
+        for b in legacy["books"].as_array_mut().unwrap() {
+            for field in [
+                "sourceTitle",
+                "customTitle",
+                "series",
+                "volume",
+                "notes",
+                "readingStatus",
+                "statusManual",
+                "tags",
+            ] {
+                b.as_object_mut().unwrap().remove(field);
+            }
+        }
+        let bytes = serde_json::to_vec(&legacy).unwrap();
+        library.restore_json(&bytes).unwrap();
+        let restored = library.list().unwrap().pop().unwrap();
+        assert_eq!(restored.reading_status, "reading");
+        assert!(restored.custom_title.is_empty());
+        library.remove(&[restored.id]).unwrap();
+        backup.version = 2;
+        backup.tags = vec![Tag {
+            id: 1,
+            name: "交易測試".into(),
+        }];
+        backup.books[0].tags = backup.tags.clone();
+        library.connection.lock().unwrap().execute_batch("CREATE TRIGGER reject_relation BEFORE INSERT ON book_tags BEGIN SELECT RAISE(ABORT,'test'); END;").unwrap();
+        let before = library.backup_json().unwrap();
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.backup_json().unwrap(), before);
+        library
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER reject_relation;")
+            .unwrap();
+        backup.books[0].tags[0].name = "未知標籤".into();
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.backup_json().unwrap(), before);
+        backup.version = 3;
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.backup_json().unwrap(), before);
+    }
+
+    #[test]
     fn windows_keys_only_convert_absolute_disks_and_complete_unc() {
         for (input, expected) in [
             (r"\\?\C:\books\pages", r"C:\books\pages"),
@@ -897,6 +1365,7 @@ mod tests {
         let mut backup = LibraryBackup {
             application: "MangaFolio".into(),
             version: 1,
+            tags: Vec::new(),
             books: vec![entry.clone()],
         };
         library
@@ -1113,7 +1582,7 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch("PRAGMA user_version=2")
+            .execute_batch("PRAGMA user_version=3")
             .unwrap();
         drop(library);
         assert!(f.library_result().is_err());
@@ -1220,6 +1689,7 @@ mod tests {
         let backup = LibraryBackup {
             application: "MangaFolio".into(),
             version: 1,
+            tags: Vec::new(),
             books: entries,
         };
         assert!(library
@@ -1240,12 +1710,20 @@ mod tests {
         let entry = library.register(&f.book()).unwrap();
         let mut backup = LibraryBackup {
             application: "MangaFolio".into(),
-            version: 2,
+            version: 3,
+            tags: Vec::new(),
             books: vec![entry.clone()],
         };
         assert!(library
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .is_err());
+        let mut future = serde_json::to_value(&backup).unwrap();
+        future["futureField"] = serde_json::json!({"newContract": true});
+        assert!(library
+            .restore_json(&serde_json::to_vec(&future).unwrap())
+            .err()
+            .unwrap()
+            .contains("較新的備份版本"));
         backup.version = 1;
         backup.books.push(entry);
         assert!(library

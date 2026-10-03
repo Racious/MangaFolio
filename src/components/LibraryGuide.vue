@@ -4,6 +4,30 @@ import { computed, ref, watch } from "vue";
 const emit = defineEmits<{ highlight: [target: string] }>();
 const steps = [
   {
+    target: "appearance",
+    title: "選擇自己的介面",
+    text: "外觀設定提供靜謐書架、目錄工作台與夜讀書房；每種風格都可切換三種檢視、明暗主題、密度與封面尺寸。",
+    check: "切換不會重設搜尋、篩選、排序或有效選取；選擇會保存在這台電腦。",
+  },
+  {
+    target: "status",
+    title: "閱讀狀態與標籤",
+    text: "未讀、閱讀中、已讀可搭配搜尋、收藏與標籤。管理模式可批次標記狀態及加入／移除標籤；管理標籤可建立、重新命名及刪除。",
+    check: "手動標記不清除續讀位置；選「依進度判定」可恢復自動狀態。",
+  },
+  {
+    target: "books",
+    title: "編輯書籍資訊",
+    text: "點書籍的「編輯資訊」設定自訂書名、系列、集數與備註。原始來源名稱另行顯示，來源檔案不會更名。",
+    check: "重新加入、開書或重新指定來源後，自訂資訊仍保留。",
+  },
+  {
+    target: "management",
+    title: "批次匯入與備份",
+    text: "多選 ZIP／CBZ 後可查看逐筆結果、停止未開始項目並重試失敗項目。管理與備份包含收藏、閱讀狀態、標籤、自訂資訊及進度，不含漫畫檔案。",
+    check: "來源失效入口可查看路徑並選取一本重新指定來源；衝突不會自動合併。",
+  },
+  {
     target: "import",
     title: "加入第一本漫畫",
     text: "點「＋ 加入 ZIP／CBZ」選取一本或多本漫畫；也可以加入直接包含圖片的資料夾。原始檔案會留在原位。",
@@ -49,7 +73,7 @@ function saveSetting(key: string, value: string) {
   }
 }
 const visible = ref(
-  readSetting("mangafolio.library-guide.v1.hidden") !== "true",
+  readSetting("mangafolio.library-guide.v1.hidden") === "false",
 );
 const savedIndex = Number(readSetting("mangafolio.library-guide.v1.step"));
 const index = ref(
@@ -78,7 +102,11 @@ function reopen() {
 </script>
 
 <template>
-  <section class="guide" aria-labelledby="guide-title">
+  <section
+    class="guide"
+    :class="{ collapsed: !visible }"
+    aria-labelledby="guide-title"
+  >
     <div class="guide-header">
       <h2 id="guide-title">新功能教學</h2>
       <button v-if="visible" @click="hide">收合教學</button>
@@ -99,7 +127,7 @@ function reopen() {
       <div class="guide-content" aria-live="polite" aria-atomic="true">
         <span class="count"
           >第 {{ index + 1 }} 步／共 {{ steps.length }} 步 ·
-          金色框線標示對應區域</span
+          重點框線標示對應區域</span
         >
         <h3>{{ current.title }}</h3>
         <p>{{ current.text }}</p>
@@ -117,16 +145,13 @@ function reopen() {
         <button v-else class="primary" @click="hide">完成教學</button>
       </div>
     </template>
-    <p v-else class="collapsed">
-      加入、閱讀、收藏、搜尋、續讀，五步認識你的書庫。
-    </p>
   </section>
 </template>
 
 <style scoped>
 .guide {
-  padding: 18px 20px;
-  margin-bottom: 24px;
+  padding: 12px 16px;
+  margin-bottom: var(--space);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-soft);
@@ -188,7 +213,7 @@ p {
 }
 .primary {
   background: var(--accent);
-  color: #17191d;
+  color: var(--accent-ink);
   border-color: var(--accent);
 }
 .collapsed {
@@ -203,5 +228,14 @@ p {
     flex: 1 1 150px;
     text-align: left;
   }
+}
+.guide.collapsed {
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+}
+.guide.collapsed h2 {
+  font-size: 12px;
+  color: var(--text-dim);
 }
 </style>
