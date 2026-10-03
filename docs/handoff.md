@@ -107,7 +107,7 @@ npm run tauri dev
 
 ## 第三階段接手重點
 
-固定基準 e38f7a8；產品 `PRODUCT_SHA_PENDING`，後續文件提交只固定產品對應。詳見 [第三階段交辦](third-phase-review-assignment.md)、[本次驗證](third-phase-validation.md)、[實際預覽](third-phase-visual-validation.md)。
+固定基準 e38f7a8；產品 `ad0e366cb0d7c4b583968243f8d864d58fce0d3e`，後續文件提交只固定產品對應。詳見 [第三階段交辦](third-phase-review-assignment.md)、[本次驗證](third-phase-validation.md)、[實際預覽](third-phase-visual-validation.md)。
 
 - 系列優先沿用 series／volume；每本單一系列、單層，不移动來源。書庫與系列搜尋／排序／位置各自保存。下一集僅純數字唯一相鄰，離線與歧義拒絕任意跳轉。
 - `library_reading.rs`：系列交易與書籤；`library_safety.rs`：升級前 SQLite online backup、還原預覽、本機安全備份與保留 manifest。

@@ -1,5 +1,5 @@
 {
-  "productSha": "PRODUCT_SHA_PENDING",
+  "productSha": "ad0e366cb0d7c4b583968243f8d864d58fce0d3e",
   "boundary": "Linux debug Tauri + live current Vite / real isolated SQLite and image decode; not Windows acceptance",
   "isolatedRoot": "/tmp/mangafolio-third-phase-native",
   "schema": 3,

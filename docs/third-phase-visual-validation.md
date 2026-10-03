@@ -1,6 +1,6 @@
 # 第三階段完整實際介面與參考對照
 
-日期：2026-10-04 Asia/Tokyo，對應產品 `PRODUCT_SHA_PENDING`。以下 PNG 都由實際執行程式擷取，沒有生成圖冒充成品。browser 畫面是實際 Vue＋隔離 mock IPC，原生畫面另列；Windows 尚未驗收。
+日期：2026-10-04 Asia/Tokyo，對應產品 `ad0e366cb0d7c4b583968243f8d864d58fce0d3e`。以下 PNG 都由實際執行程式擷取，沒有生成圖冒充成品。browser 畫面是實際 Vue＋隔離 mock IPC，原生畫面另列；Windows 尚未驗收。
 
 ## 正確參考與素材
 

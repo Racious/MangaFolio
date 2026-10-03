@@ -3,7 +3,7 @@
 日期：2026-10-04 Asia/Tokyo。Repository：Racious/MangaFolio。分支：`feature/series-library-reading`。
 
 固定開發基準：`e38f7a84c33126e11a141d10c0f38f4defb8985f`。
-最終產品提交：`PRODUCT_SHA_PENDING`。本文件的後續提交只固定 SHA／驗證對應，不另更改產品；以 Git 記錄辨識文件提交。
+最終產品提交：`ad0e366cb0d7c4b583968243f8d864d58fce0d3e`。本文件的後續提交只固定 SHA／驗證對應，不另更改產品；以 Git 記錄辨識文件提交。
 基準已含 A／R1／R2、N1／N2、UI 精修 e2a87d6 與主線 merge；舊審查不能涵蓋本次程式。
 
 ## 審查要求

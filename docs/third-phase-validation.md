@@ -1,6 +1,6 @@
 # 第三階段實際驗證
 
-日期：2026-10-04 Asia/Tokyo；隔離 Linux 環境，固定基準 `e38f7a84c33126e11a141d10c0f38f4defb8985f`，對應產品 `PRODUCT_SHA_PENDING`。後續只補文件 SHA；機器結果 [checks.json](third-phase-results/checks.json)。不使用舊測試紀錄代替本次。
+日期：2026-10-04 Asia/Tokyo；隔離 Linux 環境，固定基準 `e38f7a84c33126e11a141d10c0f38f4defb8985f`，對應產品 `ad0e366cb0d7c4b583968243f8d864d58fce0d3e`。後續只補文件 SHA；機器結果 [checks.json](third-phase-results/checks.json)。不使用舊測試紀錄代替本次。
 
 ## 必要命令（本次執行）
 
