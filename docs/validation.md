@@ -1,8 +1,49 @@
 # 書庫與教學驗證紀錄
 
-紀錄日期：2026-10-02（UTC）。本文件整理本次開發已執行的結果；本次文件整理沒有重新執行產品測試。
+更新日期：2026-10-03（Asia/Tokyo）。本文件分階段整理已執行的結果；歷史驗證保留各自基準，最新管理功能驗證如下。
 
-## 已執行結果
+## 第二輪管理與備份驗證
+
+程式基準：`df6c134`（包含初版與教學）。
+
+| 項目 | 結果 |
+| --- | --- |
+| `npm run build` | TypeScript 與 Vite 成功。 |
+| `npm test` | 3 passed、0 failed。 |
+| `cargo test --locked --manifest-path src-tauri/Cargo.toml` | 18 passed、0 failed；原有 11 項與新增 7 項。 |
+| `cargo build --locked --manifest-path src-tauri/Cargo.toml` | 原生 debug build 成功。 |
+| Rustfmt／`git diff --check` | 修改的 Rust 格式及 diff 檢查通過。 |
+| Chromium／Playwright mock IPC smoke | 批次選取與收藏、篩選清除選取、取消／失敗／成功移除、目前閱讀先 flush 後 discard、重新指定來源、匯出、失敗／成功還原、640px 寬度通過。腳本已納入 repo。 |
+| Linux 原生 Tauri | 教學與管理畫面正常；批次收藏／取消收藏後確認 SQLite 值；取消移除保留兩本，操作中關閉會保留視窗；確認移除後資料列清空且原始 CBZ 仍在，完成後可正常關閉。使用隔離測試資料目錄，不修改正式書庫。 |
+| 原生匯出／還原／重新指定來源全流程 | 未完成。匯出選檔時 PRoot／GTK 顯示目錄 `Bad address`，取消後程式可繼續操作；設定 PROOT_NO_SECCOMP=1、GIO_USE_VFS=local 重試仍失敗。尚未判定為產品缺陷，需本地重驗。 |
+
+新增的 7 個 Rust 測試覆蓋：
+
+- 批次收藏／移除包含不存在 ID 時回滾、重複 ID 拒絕、原始來源保留及自有封面清理。
+- 來源搬移及頁面重排後保留 ID、收藏、偏好、最近閱讀時間並依檔名定位。
+- 重新指定到既有來源時拒絕並保留兩本資料。
+- 備份 roundtrip、相同來源略過保留現況、不同 ID 重建與離線 metadata 持久化。
+- 損壞／超大備份或無效設定拒絕，沒有部分還原或修改現有資料。
+- 較新備份版本、重複來源、相對路徑拒絕。
+- 匯出有效備份，不覆寫既有備份或漫畫來源。
+
+新增原生畫面見 [管理介面截圖](images/library-management.png)。原生選檔限制是待補驗項目，不會用 mock 結果替代。詳細驗收與報告要求見 [審查交辦單](review-assignment.md)。
+
+## 管理介面 smoke 重跑方式
+
+此項為可選的開發檢查。使用 Python 虛擬環境，在一個終端執行 `npm run dev`，另一個終端執行：
+
+```bash
+python -m pip install playwright
+python -m playwright install chromium
+python scripts/smoke-library-management.py
+```
+
+若系統已有 Chromium，可用 `CHROMIUM_EXECUTABLE` 指定實際路徑，省略 Playwright 的瀏覽器下載。Linux 雲端驗證使用 `/usr/bin/chromium`。選配 `SMOKE_SCREENSHOT_PATH` 可保存介面截圖；父目錄需已存在。
+
+腳本在獨立瀏覽器 context 中使用記憶體測試書庫，連接 Vite 預設 port 1420 並模擬 IPC，不改實際 SQLite 或漫畫。Python／Playwright 沒有加入 npm 或 Rust 依賴。
+
+## 第一輪歷史驗證
 
 | 範圍 | 驗證基準 | 結果與限制 |
 | --- | --- | --- |

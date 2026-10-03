@@ -1,6 +1,6 @@
 # 書庫功能開發交接
 
-更新日期：2026-10-02（UTC）。範圍：本機書庫、收藏、搜尋、續讀與教學引導。
+更新日期：2026-10-03（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、教學引導、管理與備份還原。
 
 ## 目前狀態
 
@@ -10,6 +10,7 @@
 | 開發分支 | `feature/library-favorites-resume`，已推送 GitHub |
 | 核心功能提交 | `06469a6`：本機書庫、收藏、搜尋與續讀 |
 | 教學功能提交 | `7fe4acb`：五步教學與附截圖文件 |
+| 管理與備份提交 | `df6c134`：批次管理、重新指定來源、備份與合併還原 |
 | 程式版本 | 仍為 `0.1.4`，未新增發版 tag |
 | 整合與發版 | 本次工作未合併 main、未建立 PR、未發布新安裝包 |
 | 審查 | 已自我檢查與測試；尚未完成獨立 Code Review、安全審查 |
@@ -24,8 +25,11 @@
 - 切書、返回書庫與正常關閉前等待儲存；失敗時顯示錯誤，正常關閉會保留視窗供重試。
 - 跨書籍 session 隔離、延遲封面載入、小視窗工具列改善。
 - 可收合的五步教學、對應區域框線、步驟與收合狀態記憶。
+- 可勾選與批次收藏／取消收藏／移除書庫項目，原始漫畫保留。
+- 單本重新指定 ZIP／CBZ 或圖片資料夾，保留書籍 ID、收藏、閱讀設定與進度。
+- JSON 備份與合併還原，既有相同來源路徑保留、無效資料整批拒絕；匯出不覆寫既有檔案。
 
-尚未提供：遞迴掃描根目錄、刪除書庫項目、來源搬移後重新定位、頁面書籤、作者／標籤管理、全文搜尋、雲端同步。搜尋只針對已加入書庫的書名；收藏是整本收藏。
+尚未提供：遞迴掃描根目錄、頁面書籤、作者／標籤管理、全文搜尋、雲端同步。搜尋只針對已加入書庫的書名；收藏是整本收藏。
 
 ## 取得、執行與檢查
 
@@ -51,6 +55,8 @@ npm run tauri dev
 | `src/stores/reader.ts`、`src/App.vue` | 400ms 延遲儲存、序列化儲存、切書／回書庫／關閉前補存。教學以外的進度錯誤不可直接忽略。 |
 | `src/components/LibraryView.vue`、`BookCard.vue` | 書庫介面、封面、收藏與操作入口。封面卸載時釋放 blob URL。 |
 | `src/components/LibraryGuide.vue` | 五步教學與 localStorage 設定；儲存不可用時仍可操作教學。 |
+| `src/components/LibraryManager.vue` | 確認對話框、批次操作、來源重指定、JSON 備份還原與目前閱讀狀態同步。 |
+| `scripts/smoke-library-management.py` | Python Playwright 的 mock IPC 介面 smoke；不測原生檔案視窗。 |
 | `src-tauri/capabilities/default.json` | 主視窗新增 allow-destroy，以便等待進度儲存後關閉。 |
 
 新增依賴只有 Rust `rusqlite`（bundled SQLite），不需另外安裝資料庫；前端教學未新增 npm 依賴。
@@ -65,6 +71,10 @@ npm run tauri dev
 - 教學狀態位於 WebView localStorage：`mangafolio.library-guide.v1.hidden`、`mangafolio.library-guide.v1.step`，不在 SQLite。可用「開始教學」重看，不需清空書庫。
 - 未提供可逆 schema 遷移方案。未來改 schema 前，先定義升級與復原流程；回退程式時保留資料備份，不要刪除資料庫來繞過版本檢查。
 
+新增 JSON 備份格式 v1 與資料庫 schema v1 分別版本化，資料庫沒有升級。備份最多 16 MiB／10,000 本書，僅包含書庫 metadata；原始漫畫、封面與教學狀態另行保存。匯出使用 create_new，不覆寫既有檔案；還原整批驗證後以 transaction 合併，同路徑不修改，新書籍產生新 ID。移除只刪資料列及自有封面快取，原始漫畫不碰；有缺失 ID 時批次操作回滾。
+
+移除或重新指定目前載入的書時，介面先 flushProgress，再操作資料層，成功後 discardBook 清除 timer、slot、書籍 ID 與舊閱讀狀態。管理期間阻止其他書庫操作與正常關閉。重新指定來源與封面操作共用 cover_lock，再取得 SQLite connection lock；保留這個鎖順序以避免交叉等待。
+
 ## 雲端環境交接
 
 本次雲端使用 `/workspace/MangaFolio`。Node／Rust、Linux 系統依賴與工具設定在 checkout 外的 `/workspace/.mangafolio-tools/`，不會隨 Git clone 帶到本地。
@@ -78,6 +88,8 @@ npm run tauri dev
 1. 先做獨立 Code Review：進度儲存順序、關閉處理、session 隔離、SQLite 版本與錯誤處理。
 2. 在 Windows 重驗教學、加入、收藏、切書、立即關閉及重啟續讀；再驗 MSI／NSIS、安裝／解除安裝及升級。
 3. 發版前完成安全審查；目前配置的 CSP 為 null，應評估桌面權限、來源內容與更新流程，這項配置事實尚不構成已驗證漏洞。
-4. 規劃管理功能：移除書庫項目但保留漫畫、重新指定來源、批次加入及標籤；先定義資料與使用流程再開發。
+4. 規劃下一輪功能：自動掃描、作者／系列／標籤與頁面書籤。管理與備份已實作，先審查與驗收再擴充。
+
+本地 Claude／Codex 的完整審查範圍、指令與交付要求見 [審查作業交辦單](review-assignment.md)。尤其補驗原生選檔、備份匯出／還原及來源重指定：此雲端 PRoot／GTK 在選檔階段遇到 `Bad address`，調整執行環境後仍未完成全流程。
 
 本次未建立新 PR。準備合併時，以 [驗證紀錄](validation.md) 為驗收依據，透過 PR 審查。正式發版再依主 README 的版本同步、tag、release 工作流程執行；不要把分支推送當成安裝包發布。
