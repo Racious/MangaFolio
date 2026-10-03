@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import BackupPanel from "./BackupPanel.vue";
 import { computed, ref } from "vue";
-import { ask, open, save } from "@tauri-apps/plugin-dialog";
+import { ask, open } from "@tauri-apps/plugin-dialog";
 import {
-  exportBackup,
+  assignSeries,
   setReadingStatus,
   assignTag,
   favoriteBooks,
   relinkBook,
   removeBooks,
-  restoreBackup,
 } from "../api/library";
 import { pickFolder } from "../api/backend";
 import { useLibraryStore } from "../stores/library";
@@ -19,6 +19,8 @@ const emit = defineEmits<{ clear: []; selectShown: [] }>();
 const library = useLibraryStore();
 const reader = useReaderStore();
 const tagId = ref<number | null>(null);
+const series = ref("");
+async function setSeries() { await run(async(ids) => { if (!ids.length) return; await assignSeries(ids, series.value); await library.refresh(); library.importNotice = "系列歸屬已更新，書籍與來源保留。"; }); }
 async function status(status: "read" | "unread" | "auto") {
   await run(async (ids) => {
     if (!ids.length) return;
@@ -125,43 +127,6 @@ async function relink(folder: boolean) {
     library.importNotice = "已更新來源，請從封面重新開啟閱讀。";
   });
 }
-async function backup() {
-  await run(async () => {
-    const path = await save({
-      defaultPath: `MangaFolio-${new Date().toISOString().slice(0, 10)}.mangafolio.json`,
-      filters: [{ name: "MangaFolio 書庫備份", extensions: ["json"] }],
-    });
-    if (!path) return;
-    await exportBackup(path);
-    library.importNotice =
-      "備份已匯出：包含來源路徑、收藏、進度、閱讀狀態、標籤、自訂資訊與閱讀設定。漫畫檔案需另外備份。";
-  });
-}
-async function restore() {
-  await run(async () => {
-    const path = (await open({
-      multiple: false,
-      filters: [{ name: "MangaFolio 書庫備份", extensions: ["json"] }],
-    })) as string | null;
-    if (!path) return;
-    if (
-      !(await ask(
-        "將備份合併到書庫？\n相同來源路徑會保留目前資料並略過；其他書籍會加入。備份不包含漫畫檔案，找不到來源時可重新指定。",
-        {
-          title: "還原書庫備份",
-          kind: "info",
-          okLabel: "確認",
-          cancelLabel: "取消",
-        },
-      ))
-    )
-      return;
-    const result = await restoreBackup(path);
-    emit("clear");
-    await library.refresh();
-    library.importNotice = `還原完成：加入 ${result.added} 本，略過 ${result.skipped} 本既有來源。`;
-  });
-}
 </script>
 
 <template>
@@ -209,6 +174,10 @@ async function restore() {
       </button>
     </div>
     <div class="actions">
+      <label>批次系列<input v-model="series" maxlength="256" :disabled="busy" placeholder="系列名稱；留白移除歸屬" /></label>
+      <button :disabled="busy || !selectedIds.length" @click="setSeries">指定系列</button>
+    </div>
+    <div class="actions">
       <button :disabled="busy || !selectedIds.length" @click="status('read')">
         標記已讀
       </button>
@@ -237,16 +206,7 @@ async function restore() {
         批次移除標籤
       </button>
     </div>
-    <details>
-      <summary>備份與還原</summary>
-      <div class="actions">
-        <button :disabled="busy" @click="backup">匯出書庫備份</button>
-        <button :disabled="busy" @click="restore">還原書庫備份</button>
-      </div>
-      <p>
-        備份只含書庫資料，不含漫畫、封面或教學狀態。還原採合併，既有來源不覆寫；匯出請使用新檔名。
-      </p>
-    </details>
+    <BackupPanel />
     <p v-if="library.managing" role="status">正在處理書庫，請稍候…</p>
   </section>
 </template>

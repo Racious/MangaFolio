@@ -11,6 +11,12 @@ use crate::{book, image_pipeline};
 #[path = "library_metadata.rs"]
 mod metadata;
 pub use metadata::*;
+#[path = "library_reading.rs"]
+mod reading;
+pub use reading::*;
+#[path = "library_safety.rs"]
+mod safety;
+pub use safety::*;
 fn default_status() -> String {
     "unread".into()
 }
@@ -19,6 +25,8 @@ pub struct Library {
     connection: Mutex<Connection>,
     covers: PathBuf,
     cover_lock: Mutex<()>,
+    directory: PathBuf,
+    backup_lock: Mutex<()>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -219,8 +227,11 @@ impl Library {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_error)?;
-        if version > 2 {
+        if version > 3 {
             return Err("書庫來自較新版本，請更新 MangaFolio；原始資料已保留。".into());
+        }
+        if version == 1 || version == 2 {
+            safety::upgrade_snapshot(&connection, directory)?;
         }
         connection
             .execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")
@@ -242,12 +253,17 @@ impl Library {
         if version < 2 {
             metadata::migrate(&mut connection)?;
         }
+        if version == 2 {
+            reading::migrate(&mut connection)?;
+        }
         let covers = directory.join("covers");
         std::fs::create_dir_all(&covers).map_err(db_error)?;
         Ok(Self {
             connection: Mutex::new(connection),
             covers,
             cover_lock: Mutex::new(()),
+            directory: directory.to_path_buf(),
+            backup_lock: Mutex::new(()),
         })
     }
 
@@ -481,6 +497,8 @@ pub struct LibraryBackup {
     #[serde(default)]
     pub tags: Vec<Tag>,
     pub books: Vec<LibraryBook>,
+    #[serde(default)]
+    pub bookmarks: Vec<Bookmark>,
 }
 
 #[derive(Serialize)]
@@ -592,9 +610,10 @@ impl Library {
         }
         let bytes = serde_json::to_vec_pretty(&LibraryBackup {
             application: "MangaFolio".into(),
-            version: 2,
+            version: 3,
             tags,
             books,
+            bookmarks: reading::bookmarks_from(&connection, None)?,
         })
         .map_err(db_error)?;
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
@@ -605,6 +624,18 @@ impl Library {
     }
 
     pub fn export_to(&self, path: &Path) -> Result<(), String> {
+        let result = self.write_export(path);
+        if let Err(error) = &result {
+            if let Ok(conn) = self.connection.lock() {
+                let _ = conn.execute(
+                    "UPDATE backup_settings SET last_error=?1 WHERE id=1",
+                    [error],
+                );
+            }
+        }
+        result
+    }
+    fn write_export(&self, path: &Path) -> Result<(), String> {
         use std::io::Write;
         let bytes = self.backup_json()?;
         let mut file = std::fs::OpenOptions::new()
@@ -618,10 +649,18 @@ impl Library {
             let _ = std::fs::remove_file(path);
             return Err(db_error(error));
         }
+        self.connection
+            .lock()
+            .map_err(db_error)?
+            .execute(
+                "UPDATE backup_settings SET last_success=?1,last_error='' WHERE id=1",
+                [now()],
+            )
+            .map_err(db_error)?;
         Ok(())
     }
 
-    pub fn restore_json(&self, bytes: &[u8]) -> Result<RestoreResult, String> {
+    fn parse_backup(bytes: &[u8]) -> Result<LibraryBackup, String> {
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
             return Err("備份超過 16 MiB。".into());
         }
@@ -633,13 +672,13 @@ impl Library {
         }
         let header: BackupHeader =
             serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
-        if header.version > 2 {
+        if header.version > 3 {
             return Err("不支援較新的備份版本，未還原任何項目。".into());
         }
         let mut backup: LibraryBackup =
             serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
         if backup.application != "MangaFolio"
-            || ![1, 2].contains(&backup.version)
+            || ![1, 2, 3].contains(&backup.version)
             || backup.books.len() > MAX_BACKUP_BOOKS
         {
             return Err("不支援的備份格式、版本或書籍數量。".into());
@@ -724,6 +763,12 @@ impl Library {
                 return Err("備份含無效或重複的書籍資料，未還原任何項目。".into());
             }
         }
+        reading::validate_backup_bookmarks(&backup)?;
+        Ok(backup)
+    }
+
+    pub fn restore_json(&self, bytes: &[u8]) -> Result<RestoreResult, String> {
+        let backup = Self::parse_backup(bytes)?;
         let mut connection = self.connection.lock().map_err(db_error)?;
         let transaction = connection.transaction().map_err(db_error)?;
         let mut tag_ids = std::collections::HashMap::new();
@@ -760,6 +805,13 @@ impl Library {
         };
         let mut existing_keys: std::collections::HashSet<String> =
             stored_paths.iter().map(|p| source_key(p)).collect();
+        let mut bookmark_map = std::collections::HashMap::<i64, Vec<&Bookmark>>::new();
+        for bookmark in &backup.bookmarks {
+            bookmark_map
+                .entry(bookmark.book_id)
+                .or_default()
+                .push(bookmark);
+        }
         for book in backup.books {
             // Compare identities while preserving the supplied storage path spelling.
             let key = source_key(&book.path);
@@ -774,6 +826,9 @@ impl Library {
             if added == 1 {
                 let id = transaction.last_insert_rowid();
                 transaction.execute("UPDATE books SET custom_title=?1,series=?2,volume=?3,notes=?4,reading_status=?5,status_manual=?6 WHERE id=?7",params![book.custom_title.trim(),book.series.trim(),book.volume.trim(),book.notes,book.reading_status,book.status_manual,id]).map_err(db_error)?;
+                for bookmark in bookmark_map.get(&book.id).into_iter().flatten() {
+                    reading::insert_bookmark(&transaction, id, bookmark)?;
+                }
                 for tag in book.tags {
                     let key = metadata::tag_key(&tag.name)?;
                     transaction
@@ -1037,6 +1092,7 @@ mod tests {
         b.last_read_at = Some(123);
         b.preferences.page_mode = "double".into();
         let backup = LibraryBackup {
+            bookmarks: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: vec![],
@@ -1189,6 +1245,7 @@ mod tests {
             })
             .collect();
         let backup = LibraryBackup {
+            bookmarks: vec![],
             application: "MangaFolio".into(),
             version: 2,
             tags: vec![],
@@ -1293,7 +1350,7 @@ mod tests {
                 .unwrap()
                 .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            2
+            3
         );
     }
 
@@ -1473,7 +1530,7 @@ mod tests {
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .is_err());
         assert_eq!(library.backup_json().unwrap(), before);
-        backup.version = 3;
+        backup.version = 4;
         assert!(library
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .is_err());
@@ -1596,6 +1653,7 @@ mod tests {
         library.remove(&[entry.id]).unwrap();
         entry.path = r"Z:\mangafolio-missing\pages".into();
         let mut backup = LibraryBackup {
+            bookmarks: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: Vec::new(),
@@ -1815,7 +1873,7 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch("PRAGMA user_version=3")
+            .execute_batch("PRAGMA user_version=4")
             .unwrap();
         drop(library);
         assert!(f.library_result().is_err());
@@ -1920,6 +1978,7 @@ mod tests {
         entries[0].favorite = true;
         entries[1].preferences.zoom = "bad".into();
         let backup = LibraryBackup {
+            bookmarks: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: Vec::new(),
@@ -1942,8 +2001,9 @@ mod tests {
         let library = f.library();
         let entry = library.register(&f.book()).unwrap();
         let mut backup = LibraryBackup {
+            bookmarks: vec![],
             application: "MangaFolio".into(),
-            version: 3,
+            version: 4,
             tags: Vec::new(),
             books: vec![entry.clone()],
         };

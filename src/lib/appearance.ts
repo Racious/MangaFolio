@@ -13,6 +13,7 @@ export interface Appearance {
   view: "grid" | "detail" | "compact";
   density: "comfortable" | "compact";
   coverSize: "small" | "medium" | "large";
+  readerPinned: boolean;
 }
 export const appearanceKey = "mangafolio.appearance.v1";
 export const defaultAppearance: Appearance = {
@@ -21,6 +22,7 @@ export const defaultAppearance: Appearance = {
   view: "grid",
   density: "comfortable",
   coverSize: "medium",
+  readerPinned: false,
 };
 export function parseAppearance(raw: string | null): Appearance {
   try {
@@ -35,10 +37,12 @@ export function parseAppearance(raw: string | null): Appearance {
       coverSize: ["small", "medium", "large"],
     };
     const result = { ...defaultAppearance };
-    for (const key of Object.keys(allowed) as (keyof Appearance)[]) {
+    for (const key of Object.keys(allowed) as (keyof typeof allowed)[]) {
       if (allowed[key].includes(data[key]))
         Object.assign(result, { [key]: data[key] });
     }
+    if (typeof data.readerPinned === "boolean")
+      result.readerPinned = data.readerPinned;
     return result;
   } catch {
     return { ...defaultAppearance };

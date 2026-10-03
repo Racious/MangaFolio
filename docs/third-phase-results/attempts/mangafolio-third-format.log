@@ -1,0 +1,16 @@
+src/components/BackupPanel.vue 159ms
+src/components/BookCover.vue 15ms
+src/components/BookDetailsPanel.vue 65ms
+src/components/BookmarksPanel.vue 70ms
+src/components/ReaderActions.vue 56ms
+src/components/SeriesShelf.vue 32ms
+src/components/LibraryView.vue 225ms
+src/components/ContinueReading.vue 35ms
+src/components/ImmersiveReader.vue 20ms
+src/App.vue 29ms
+src/lib/series.ts 18ms
+src/stores/backup.ts 10ms
+src/stores/library.ts 21ms (unchanged)
+src/api/library.ts 20ms
+src/lib/appearance.ts 7ms
+tests/series.test.ts 7ms

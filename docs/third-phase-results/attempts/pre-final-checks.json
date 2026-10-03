@@ -1,0 +1,60 @@
+{
+  "productSha": "PRODUCT_SHA_PENDING",
+  "baseline": "e38f7a84c33126e11a141d10c0f38f4defb8985f",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "seconds": 0.825,
+      "output": "docs/third-phase-results/npm-test.log",
+      "utc": "2026-10-03T17:47:05.196213+00:00"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 6.325,
+      "output": "docs/third-phase-results/npm-build.log",
+      "utc": "2026-10-03T17:47:11.521836+00:00"
+    },
+    {
+      "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+      "exitCode": 0,
+      "seconds": 0.862,
+      "output": "docs/third-phase-results/cargo-test.log",
+      "utc": "2026-10-03T17:47:12.384489+00:00"
+    },
+    {
+      "command": "python scripts/validate-third-phase.py",
+      "exitCode": 0,
+      "seconds": 6.599,
+      "output": "docs/third-phase-results/browser-third-phase.log",
+      "utc": "2026-10-03T17:47:18.983622+00:00"
+    },
+    {
+      "command": "python scripts/validate-next-phase.py",
+      "exitCode": 0,
+      "seconds": 6.851,
+      "output": "docs/third-phase-results/browser-regression.log",
+      "utc": "2026-10-03T17:47:25.835205+00:00"
+    },
+    {
+      "command": "python scripts/validate-immersive-reader.py",
+      "exitCode": 0,
+      "seconds": 4.804,
+      "output": "docs/third-phase-results/reader-regression.log",
+      "utc": "2026-10-03T17:47:30.639126+00:00"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "seconds": 0.007,
+      "output": "docs/third-phase-results/git-diff-check.log",
+      "utc": "2026-10-03T17:47:30.646621+00:00"
+    },
+    {
+      "command": "python scripts/validate-third-phase.py (expanded three-style gallery)",
+      "exitCode": 0,
+      "output": "docs/third-phase-results/browser-gallery.log"
+    }
+  ]
+}

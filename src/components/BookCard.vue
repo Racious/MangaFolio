@@ -11,6 +11,7 @@ const props = defineProps<{
   favoritePending: boolean;
   selectable?: boolean;
   selected?: boolean;
+  focused?: boolean;
   view?: "grid" | "detail" | "compact";
 }>();
 const emit = defineEmits<{
@@ -59,7 +60,7 @@ onUnmounted(() => {
     class="book-card"
     :class="[
       view ?? 'grid',
-      { offline: !book.available, picked: selectable && selected },
+      { offline: !book.available, picked: selectable && selected, focused },
     ]"
   >
     <label v-if="selectable" class="selection">
@@ -146,10 +147,10 @@ onUnmounted(() => {
       <button
         class="edit"
         :disabled="opening"
-        :aria-label="`編輯資訊：${book.title}`"
+        :aria-label="`查看資訊：${book.title}`"
         @click="emit('edit', book)"
       >
-        <PhPencilSimple :size="14" aria-hidden="true" /> 編輯資訊
+        <PhPencilSimple :size="14" aria-hidden="true" /> 查看資訊
       </button>
     </div>
   </article>
@@ -308,6 +309,7 @@ p {
 .detail p {
   margin-top: 0;
 }
+.focused { background:var(--bg-soft);box-shadow:inset 3px 0 var(--accent); }
 .picked {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);

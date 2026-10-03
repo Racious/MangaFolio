@@ -76,6 +76,7 @@ function change<K extends keyof Appearance>(key: K, event: Event) {
           <option value="large">大</option>
         </select></label
       >
+      <label><span><input type="checkbox" :checked="appearance.settings.readerPinned" @change="appearance.set('readerPinned', ($event.target as HTMLInputElement).checked)" /> 固定顯示閱讀工具列</span></label>
       <p v-if="appearance.saveFailed" role="status">
         設定暫時無法保存，本次仍可使用；重新啟動可能恢復預設。
       </p>

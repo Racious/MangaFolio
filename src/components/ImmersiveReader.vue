@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 
-const pinned = ref(false);
+import { useAppearanceStore } from "../stores/appearance";
+const appearance = useAppearanceStore();
+const pinned = ref(appearance.settings.readerPinned);
+watch(
+  () => appearance.settings.readerPinned,
+  (value) => {
+    pinned.value = value;
+  },
+);
 function onKey(event: KeyboardEvent) {
   if (
     event.key !== "Escape" ||
@@ -12,7 +20,7 @@ function onKey(event: KeyboardEvent) {
   )
     return;
   if (
-    document.querySelector("[role='dialog']") ||
+    document.querySelector("dialog[open], [role='dialog']:not(dialog)") ||
     (event.target instanceof Element &&
       event.target.closest("input, textarea, select, [contenteditable]"))
   )

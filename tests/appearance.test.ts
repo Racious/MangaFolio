@@ -19,6 +19,7 @@ test("appearance restores known settings and tolerates missing or corrupt storag
       view: "compact",
       density: "compact",
       coverSize: "large",
+    readerPinned: false,
     },
   );
   assert.equal(
@@ -79,3 +80,5 @@ test("styles are independent from view and theme and old preferences gain defaul
     "calm",
   );
 });
+
+test("reader toolbar pin defaults off and validates persisted boolean independently",()=>{assert.equal(parseAppearance(null).readerPinned,false);assert.equal(parseAppearance('{"readerPinned":true}').readerPinned,true);assert.equal(parseAppearance('{"readerPinned":"true"}').readerPinned,false);});

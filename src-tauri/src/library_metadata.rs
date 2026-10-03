@@ -24,7 +24,7 @@ pub(super) fn valid_text(value: &str, maximum: usize) -> Result<(), String> {
 impl BookDetails {
     pub(super) fn validate(&self) -> Result<(), String> {
         valid_text(&self.custom_title, 256)?;
-        valid_text(&self.series, 256)?;
+        super::reading::series_name(&self.series)?;
         valid_text(&self.volume, 64)?;
         valid_text(&self.notes, 4000)
     }
@@ -75,6 +75,7 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<(), String> {
         )
         .map_err(db_error)?;
     }
+    super::reading::migrate_in(&tx)?;
     tx.commit().map_err(db_error)
 }
 /// Matches reader pairStartOf/indicesOf; keep the saved spread-start index unchanged.

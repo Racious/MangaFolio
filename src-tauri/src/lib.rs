@@ -27,6 +27,7 @@ pub fn run() {
             commands::open_path,
             commands::render_page,
             commands::open_library_book,
+            commands::open_bookmark,
             library::list_library,
             library::import_book,
             library::set_favorite,
@@ -44,6 +45,14 @@ pub fn run() {
             library::rename_tag,
             library::delete_tag,
             library::assign_book_tag,
+            library::assign_book_series,
+            library::list_bookmarks,
+            library::save_bookmark,
+            library::delete_bookmark,
+            library::preview_library_backup,
+            library::get_backup_settings,
+            library::set_backup_settings,
+            library::run_automatic_backup,
             library::restore_library_backup
         ])
         .run(tauri::generate_context!())

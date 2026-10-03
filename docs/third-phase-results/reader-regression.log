@@ -1,0 +1,14 @@
+{
+  "exitCode": 0,
+  "checks": [
+    "opening defaults to hidden chrome; reader uses all 1440x1000 pixels",
+    "top/bottom edge hover reveals controls; leaving hides; viewport unchanged",
+    "Escape toggles both bars; keyboard focus reveals hidden controls; IME and input focus do not toggle",
+    "closed bookmark dialog does not block reader ArrowRight navigation",
+    "save errors and retry stay visible while chrome hidden",
+    "640x480 immersive canvas and reachable top controls without document overflow",
+    "touch control explicitly shows/hides bars without turning a page"
+  ],
+  "pageErrors": [],
+  "boundary": "Actual Vue components / isolated browser mock IPC; not Windows native acceptance"
+}

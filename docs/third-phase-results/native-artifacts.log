@@ -1,0 +1,10 @@
+{
+  "exitCode": 0,
+  "checks": [
+    "isolated schema v3 and 28 books",
+    "book 3 last page saved before next volume 4",
+    "native bookmark page-name/index saved",
+    "native immediate backup succeeded with v3 books and bookmarks"
+  ],
+  "boundary": "Read-only saved artifacts of isolated Linux native UI workflow, not Windows acceptance"
+}

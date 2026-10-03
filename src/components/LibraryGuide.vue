@@ -3,6 +3,8 @@ import { computed, ref, watch } from "vue";
 
 const emit = defineEmits<{ highlight: [target: string] }>();
 const steps = [
+  { target:"books",title:"系列書架與下一集",text:"管理模式可批次指定系列；點系列封面查看全部集數，返回保留首頁搜尋。書籍詳情集中編輯、重新連結與書籤。",check:"最後跨頁可選閱讀下一集；缺值、重複、特殊集數或跳號須自行選書，來源失效不跳過。" },
+  { target:"management",title:"安全備份與書籤",text:"閱讀器可標記雙頁其中一頁，純文字筆記依頁名定位。備份含書籤，不含漫畫／封面／外觀；還原前先預覽，確認後重新驗證。",check:"升級前先保存 SQLite 一致性快照；自動備份可開關及設定保留數量。" },
   {
     target: "appearance",
     title: "選擇自己的介面",
@@ -18,7 +20,7 @@ const steps = [
   {
     target: "books",
     title: "編輯書籍資訊",
-    text: "點書籍的「編輯資訊」設定自訂書名、系列、集數與備註。原始來源名稱另行顯示，來源檔案不會更名。",
+    text: "點書籍的「查看資訊」，再選「編輯資訊」設定自訂書名、系列、集數與備註。原始來源名稱另行顯示，來源檔案不會更名。",
     check: "重新加入、開書或重新指定來源後，自訂資訊仍保留。",
   },
   {

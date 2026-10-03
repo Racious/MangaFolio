@@ -147,7 +147,7 @@ function onKey(e: KeyboardEvent) {
     target?.closest(
       "input, textarea, select, button, [contenteditable], [role='dialog']",
     ) ||
-    document.querySelector("[role='dialog']")
+    document.querySelector("dialog[open], [role='dialog']:not(dialog)")
   )
     return;
   const el = scroller.value;

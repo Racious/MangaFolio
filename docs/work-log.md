@@ -78,3 +78,14 @@
 隔離瀏覽器及 Linux Tauri 有實際截图，驗證輸出另存 `docs/next-phase-results/visual-refinement`，不覆蓋歷史證據。本次先提供 [完整畫面](ui-refinement-preview.md) 給使用者看，修改保留工作區，未產生本次提交。Windows 原生及實體觸控尚未驗收。
 
 使用者後續授權將目前功能分支合併主線，要求保留 merge commit；先提交介面精修及隔離驗證證據，再以 `--no-ff` 合併。Windows 本次原生驗收仍未執行，合併不代表發布版本。
+
+
+## 2026-10-04｜第三階段系列、書籤與安全備份
+
+基準 e38f7a84c33126e11a141d10c0f38f4defb8985f，從已保留 merge 的最新主線建立 feature/series-library-reading；前階段 UI 精修 e2a87d6 已在基準。起始 workspace 乾淨，原工作區／提交保留，未找到適用 AGENTS.md。
+
+使用者訂正參考圖片，已直接讀取對話正確三張，不引用舊圖。先記錄配套設計及 v3 契約，再完成系列／詳情、保守下一集、書籤純文字筆記、WAL 一致性升級快照、自動備份／唯讀還原預覽，以及三風格共用介面。
+
+整合期間修正書籤 dialog 受隱藏工具列影響（Teleport）及關閉 dialog 阻擋 Esc／方向鍵；新增回歸。保存完整嘗試輸出與最終 npm21／Rust44、build、三組 browser 測試。大型書庫 10,000 本聚合／初始 60 個系列封面量測；另補切集 in-flight 關閉視窗保護與成功備份後清理失敗的精確回報。修正共用封面在來源重新上線後的更新與過期非同步結果保護，並以保留的詳情元件測試。有限 Linux Tauri 實際滿高閱讀、詳情、書籤寫入與下一集證據。
+
+第三階段未合併 main／未發版，Windows 等未驗項與原 PNG 歸檔外部限制明列於第三階段驗證／交辦；產品 PRODUCT_SHA_PENDING，後續文件提交固定對應。

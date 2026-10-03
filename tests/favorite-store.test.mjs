@@ -13,8 +13,8 @@ try {
     `export let handler; export const configure = fn => handler = fn;
     export const setFavorite = (...args) => handler(...args);
     export const listLibrary = async () => []; export let importHandler; export const configureImport = fn => importHandler=fn; export const importBookResult = (...args) => importHandler(...args); export const listTags = async () => [];
-    export const saveProgress = async () => {}; export const openPath = async () => {};
-    export const openLibraryBook = async () => {}; export const renderPageUrl = async () => '';`,
+    export let loadHandler,saveHandler; export const configureLoad=fn=>loadHandler=fn; export const configureSave=fn=>saveHandler=fn; export const saveProgress = async (...args) => saveHandler?.(...args); export const openPath = async () => {};
+    export const openLibraryBook = async (...args) => loadHandler?.(...args); export const openBookmark = async (...args) => loadHandler?.(...args); export const renderPageUrl = async () => '';`,
   );
   for (const name of ["reader", "library"]) {
     let source = await readFile(
@@ -61,7 +61,7 @@ try {
   const { useReaderStore } = await import(
     pathToFileURL(`${directory}/reader.mjs`)
   );
-  const { configure, configureImport } = await import(
+  const { configure, configureImport, configureLoad, configureSave } = await import(
     pathToFileURL(`${directory}/ipc.mjs`)
   );
   function setup() {
@@ -72,6 +72,15 @@ try {
     reader.bookId = 1;
     return { library, reader, book: library.books[0] };
   }
+  test("switching volume waits for save and preserves current book when save/open fails",async()=>{
+    const {reader}=setup();reader.pages=["1.png","2.png"];reader.index=1;reader.title="Current";
+    const before=JSON.stringify([reader.bookId,reader.pages,reader.index,reader.title]);let called=false;
+    configureSave(async()=>{throw new Error("save blocked");});configureLoad(async()=>{called=true;});
+    assert.equal(await reader.openBook(2),false);assert.equal(called,false);assert.equal(JSON.stringify([reader.bookId,reader.pages,reader.index,reader.title]),before);
+    configureSave(async()=>{});configureLoad(async()=>{throw new Error("source conflict or offline");});
+    assert.equal(await reader.openBook(2),false);assert.equal(JSON.stringify([reader.bookId,reader.pages,reader.index,reader.title]),before);
+    assert.equal(await reader.openBookmark(2,5),false);assert.equal(JSON.stringify([reader.bookId,reader.pages,reader.index,reader.title]),before);reader.discardBook();configureSave(undefined);
+  });
   test("card favorite and unfavorite synchronize retained reader and its next toggle", async () => {
     const { library, reader, book } = setup();
     const calls = [];

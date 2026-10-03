@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import {
   openPath,
   openLibraryBook,
+  openBookmark,
   renderPageUrl,
   type BookInfo,
   type FitMode,
@@ -154,6 +155,8 @@ export const useReaderStore = defineStore("reader", {
     async open(path: string) {
       return this.loadBook(() => openPath(path));
     },
+
+    async openBookmark(bookId:number,id:number) { return this.loadBook(()=>openBookmark(bookId,id)); },
 
     async openBook(id: number) {
       return this.loadBook(() => openLibraryBook(id));

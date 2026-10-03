@@ -23,10 +23,15 @@ onUnmounted(() => {
 </script>
 <template>
   <section class="continue-panel" aria-label="繼續閱讀">
+    <img v-if="cover" class="resume-background" :src="cover" alt="" />
     <img v-if="cover" class="resume-cover" :src="cover" alt="" />
     <div class="resume-info">
       <p class="resume-label">繼續上次的故事</p>
       <h2>{{ book.title }}</h2>
+      <p v-if="book.series || book.volume" class="resume-series">
+        {{ book.series }}{{ book.volume ? ` · 第 ${book.volume} 集` : "" }}
+      </p>
+      <p v-if="book.notes" class="resume-note">{{ book.notes }}</p>
       <p class="resume-page">
         第 {{ book.lastIndex + 1 }}／{{ book.pageCount }} 頁 ·
         {{ progressPercent(book) }}%
@@ -38,14 +43,16 @@ onUnmounted(() => {
       >
         <span :style="{ width: `${progressPercent(book)}%` }" />
       </div>
+      <button class="primary" :disabled="busy" @click="$emit('open', book.id)">
+        接著讀
+      </button>
     </div>
-    <button class="primary" :disabled="busy" @click="$emit('open', book.id)">
-      接著讀
-    </button>
   </section>
 </template>
 <style scoped>
 .continue-panel {
+  position: relative;
+  min-height: var(--hero-min-height);
   display: flex;
   align-items: center;
   gap: var(--resume-gap);
@@ -56,17 +63,51 @@ onUnmounted(() => {
   background: var(--resume-surface);
   overflow: hidden;
 }
-.resume-cover {
-  width: var(--resume-cover-width);
-  height: var(--resume-cover-height);
+.resume-background {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 70%;
+  height: 100%;
   object-fit: cover;
+  opacity: 0.13;
+  filter: blur(2px);
+  pointer-events: none;
+}
+.continue-panel > :not(.resume-background) {
+  position: relative;
+  z-index: 1;
+}
+.resume-series {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.resume-note {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 420px;
+  margin-bottom: 12px;
+}
+.resume-cover {
+  width: var(--hero-cover-width);
+  height: var(--hero-cover-height);
+  object-fit: contain;
   border-radius: var(--resume-cover-radius);
   box-shadow: var(--cover-shadow);
   flex: 0 0 auto;
 }
 .resume-info {
-  flex: 1;
+  flex: 0 1 420px;
   min-width: 0;
+  background: var(--resume-surface);
+  padding: 12px;
+  border-radius: var(--radius);
 }
 .resume-label {
   font-size: 12px;
@@ -99,6 +140,7 @@ h2 {
 }
 button {
   flex: 0 0 auto;
+  margin-top: 16px;
   padding: 12px 22px;
 }
 @media (max-width: 700px) {
@@ -116,7 +158,7 @@ button {
     font-size: 20px;
   }
   button {
-    margin-left: auto;
+    margin-top: 12px;
   }
 }
 </style>

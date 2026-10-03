@@ -17,6 +17,11 @@
   --content-padding: 32px;
   --sidebar-width: 240px;
   --cover-min: 230px;
+  --modal-backdrop: #00000055;
+  --hero-min-height: 320px;
+  --hero-cover-width: 180px;
+  --hero-cover-height: 240px;
+  --detail-width: 420px;
   --line: color-mix(in srgb, var(--text) 14%, var(--bg));
   --surface-shadow: 0 2px 8px #00000008;
   --cover-shadow: 0 8px 20px #00000016;

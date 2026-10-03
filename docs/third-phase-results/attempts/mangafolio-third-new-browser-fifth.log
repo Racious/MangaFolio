@@ -1,0 +1,12 @@
+{
+  "exitCode": 0,
+  "checks": [
+    "three styles and series shared views/search; same data screenshots of home, series and book details",
+    "return restores homepage search, sort and scroll",
+    "series batch failure/success; read-only restore preview and auto-backup preference controls",
+    "bookmarks fail/retry, plain text, missing-page preservation, pinned toolbar, last-page next volume failure/success",
+    "640x480 navigation, series and book detail controls accessible without horizontal overflow"
+  ],
+  "pageErrors": [],
+  "boundary": "Actual Vue browser / in-memory isolated mock IPC; not native Windows acceptance"
+}

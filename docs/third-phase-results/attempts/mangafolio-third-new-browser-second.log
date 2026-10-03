@@ -1,0 +1,23 @@
+{'calls': [{'cmd': 'library_cover', 'args': {'id': 1}}, {'cmd': 'get_backup_settings', 'args': {}}, {'cmd': 'library_cover', 'args': {'id': 3}}, {'cmd': 'library_cover', 'args': {'id': 4}}, {'cmd': 'library_cover', 'args': {'id': 5}}, {'cmd': 'assign_book_series', 'args': {'ids': [1], 'name': '新系列'}}], 'fail': True, 'selected': '管理與備份\n\n先勾選卡片。移除只影響書庫紀錄；重新指定來源請選同一本漫畫。\n\n已選 1 本\n選取目前顯示的 10 本\n清除選取\n批次收藏\n批次取消收藏\n移除所選\n重新指定 ZIP／CBZ\n重新指定圖片資料夾\n批次系列\n指定系列\n標記已讀\n標記未讀\n依進度判定\n選擇標籤\n冒險\n日常\n批次加入標籤\n批次移除標籤\n備份與還原', 'error': 'TEST series transaction failed 重新載入書庫'}
+Traceback (most recent call last):
+  File "/workspace/MangaFolio-management-ui/scripts/validate-third-phase.py", line 67, in <module>
+    page.get_by_role('button',name='管理與備份',exact=True).click();page.get_by_role('checkbox',name='選取：海風紀事 01',exact=True).check();page.get_by_label('批次系列',exact=True).fill('新系列');page.evaluate('window.failSeries=true');page.get_by_role('button',name='指定系列',exact=True).click();page.wait_for_timeout(200);print(page.evaluate('({calls:calls.slice(-6),fail:failSeries,selected:document.querySelector(".manager")?.innerText,error:document.querySelector(".notice.error")?.innerText})'),flush=True);page.get_by_text('TEST series transaction failed',exact=True).wait_for();assert page.evaluate('testBooks[0].series')=='海風紀事'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 20539, in wait_for
+    self._sync(
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/_impl/_locator.py", line 748, in wait_for
+    await self._frame.wait_for_selector(
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/_impl/_frame.py", line 394, in wait_for_selector
+    await self._channel.send(
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 76, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 632, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.wait_for: Timeout 10000ms exceeded.
+Call log:
+  - waiting for get_by_text("TEST series transaction failed", exact=True) to be visible
+
