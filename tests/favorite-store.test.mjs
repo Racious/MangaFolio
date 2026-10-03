@@ -146,6 +146,25 @@ try {
     assert.deepEqual(calls, ["first"]);
     assert.equal(library.importing, false);
   });
+  test("reader final spreads retain the start index in progress snapshots", () => {
+    for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      for (const cover of [false, true]) {
+        const { reader } = setup();
+        reader.pages = Array.from({ length: count }, (_, i) => `${i}.png`);
+        reader.pageMode = "double";
+        reader.doubleCover = cover;
+        const start = count === 1 ? 0 : ((cover && count % 2 === 0) || (!cover && count % 2 === 1)) ? count - 1 : count - 2;
+        reader.index = start;
+        assert.equal(reader.atLast, true);
+        assert.equal(Math.max(...reader.viewIndices), count - 1);
+        assert.equal(reader.progressSnapshot().index, start);
+        if (start > 0) {
+          reader.index = start - 1;
+          assert.equal(reader.atLast, false);
+        }
+      }
+    }
+  });
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

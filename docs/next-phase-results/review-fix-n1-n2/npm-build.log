@@ -1,0 +1,13 @@
+
+> manga-reader@0.1.4 build
+> vue-tsc --noEmit && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 74 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.48 kB │ gzip:  0.31 kB
+dist/assets/index-2PJqgIAq.css   24.10 kB │ gzip:  5.12 kB
+dist/assets/index-rTGNvt9S.js   144.65 kB │ gzip: 51.75 kB
+✓ built in 1.11s

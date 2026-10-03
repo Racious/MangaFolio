@@ -335,6 +335,7 @@ impl Library {
                     params![book.title, book.format(), book.len(), id],
                 )
                 .map_err(db_error)?;
+            metadata::reconcile_source(&connection, id, &book.page_names())?;
             let updated = connection
                 .query_row(
                     &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
@@ -349,6 +350,10 @@ impl Library {
             VALUES(?1,?2,?3,?4,?5,?6)
             ON CONFLICT(path) DO UPDATE SET title=excluded.title,format=excluded.format,page_count=excluded.page_count",
             params![path, book.title, book.format(), book.len(), preferences, now()]).map_err(db_error)?;
+        let id: i64 = connection
+            .query_row("SELECT id FROM books WHERE path=?1", [&path], |r| r.get(0))
+            .map_err(db_error)?;
+        metadata::reconcile_source(&connection, id, &book.page_names())?;
         let updated = connection
             .query_row(
                 &format!("SELECT {COLUMNS} FROM books WHERE path=?1"),
@@ -380,22 +385,27 @@ impl Library {
         preferences: &ReaderPreferences,
     ) -> Result<(), String> {
         preferences.validate()?;
-        let preferences = serde_json::to_string(preferences).map_err(db_error)?;
-        let changed = self
-            .connection
-            .lock()
-            .map_err(db_error)?
-            .execute(
-                "UPDATE books SET last_index=?1,last_page_name=?2,
-            last_read_at=?3,preferences=?4,
-            reading_status=CASE WHEN status_manual=1 THEN reading_status WHEN ?1>=page_count-1 THEN 'read' ELSE 'reading' END
-            WHERE id=?5 AND page_count>?1",
-                params![index, page_name, now(), preferences, id],
-            )
+        let mut connection = self.connection.lock().map_err(db_error)?;
+        let tx = connection.transaction().map_err(db_error)?;
+        let count: Option<usize> = tx
+            .query_row("SELECT page_count FROM books WHERE id=?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
             .map_err(db_error)?;
-        if changed == 0 {
-            return Err("書籍不存在或頁碼超出範圍。".into());
-        }
+        let count = count
+            .filter(|count| index < *count)
+            .ok_or_else(|| "書籍不存在或頁碼超出範圍。".to_string())?;
+        let timestamp = now();
+        let status = metadata::automatic_status(index, count, Some(timestamp), preferences);
+        let preferences = serde_json::to_string(preferences).map_err(db_error)?;
+        tx.execute(
+            "UPDATE books SET last_index=?1,last_page_name=?2,last_read_at=?3,preferences=?4,
+            reading_status=CASE WHEN status_manual=1 THEN reading_status ELSE ?5 END WHERE id=?6",
+            params![index, page_name, timestamp, preferences, status, id],
+        )
+        .map_err(db_error)?;
+        tx.commit().map_err(db_error)?;
         Ok(())
     }
 
@@ -552,6 +562,7 @@ impl Library {
         let index = resume_index(&saved, &pages);
         let page_name = saved.last_page_name.as_ref().map(|_| pages[index].clone());
         transaction.execute("UPDATE books SET path=?1,title=?2,format=?3,page_count=?4,last_index=?5,last_page_name=?6 WHERE id=?7", params![path, book.title, book.format(), book.len(), index, page_name, id]).map_err(db_error)?;
+        metadata::reconcile_source(&transaction, id, &pages)?;
         let updated = transaction
             .query_row(
                 &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
@@ -655,13 +666,12 @@ impl Library {
                 book.notes.clear();
                 book.tags.clear();
                 book.status_manual = false;
-                book.reading_status = if book.last_read_at.is_none() {
-                    "unread"
-                } else if book.last_index >= book.page_count.saturating_sub(1) {
-                    "read"
-                } else {
-                    "reading"
-                }
+                book.reading_status = metadata::automatic_status(
+                    book.last_index,
+                    book.page_count,
+                    book.last_read_at,
+                    &book.preferences,
+                )
                 .into();
             } else {
                 metadata::BookDetails {
@@ -945,6 +955,223 @@ mod tests {
     }
 
     #[test]
+    fn automatic_status_matches_final_spreads_and_preserves_manual_states() {
+        for count in 1..=8 {
+            let f = Fixture::new();
+            std::fs::remove_dir_all(f.0.join("pages")).unwrap();
+            std::fs::create_dir(f.0.join("pages")).unwrap();
+            for i in 0..count {
+                image::RgbImage::from_pixel(20, 30, image::Rgb([20, 30, 40]))
+                    .save(f.0.join("pages").join(format!("{i:03}.png")))
+                    .unwrap();
+            }
+            let library = f.library();
+            let b = library.register(&f.book()).unwrap();
+            for mode in ["single", "double"] {
+                for cover in [false, true] {
+                    let prefs = ReaderPreferences {
+                        page_mode: mode.into(),
+                        double_cover: cover,
+                        ..Default::default()
+                    };
+                    let last_start = if mode == "single" || count == 1 {
+                        count - 1
+                    } else if (cover && count % 2 == 0) || (!cover && count % 2 == 1) {
+                        count - 1
+                    } else {
+                        count - 2
+                    };
+                    library.set_status(&[b.id], "auto").unwrap();
+                    for index in 0..count {
+                        library
+                            .save_progress(b.id, index, &format!("{index:03}.png"), &prefs)
+                            .unwrap();
+                        let saved = library.get(b.id).unwrap();
+                        assert_eq!(
+                            saved.last_index, index,
+                            "spread-start contract must remain unchanged"
+                        );
+                        assert_eq!(
+                            saved.reading_status,
+                            if index >= last_start {
+                                "read"
+                            } else {
+                                "reading"
+                            },
+                            "count={count} mode={mode} cover={cover} index={index}"
+                        );
+                        library.set_status(&[b.id], "auto").unwrap();
+                        assert_eq!(
+                            library.get(b.id).unwrap().reading_status,
+                            saved.reading_status
+                        );
+                    }
+                    for manual in ["read", "unread"] {
+                        library.set_status(&[b.id], manual).unwrap();
+                        library
+                            .save_progress(
+                                b.id,
+                                last_start,
+                                &format!("{last_start:03}.png"),
+                                &prefs,
+                            )
+                            .unwrap();
+                        assert_eq!(library.get(b.id).unwrap().reading_status, manual);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn v1_backup_last_double_spread_derives_completed_status() {
+        let f = Fixture::new();
+        let library = f.library();
+        let mut b = library.register(&f.book()).unwrap();
+        b.path =
+            f.0.join("offline-double.cbz")
+                .to_string_lossy()
+                .into_owned();
+        b.page_count = 6;
+        b.last_index = 4;
+        b.last_read_at = Some(123);
+        b.preferences.page_mode = "double".into();
+        let backup = LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 1,
+            tags: vec![],
+            books: vec![b],
+        };
+        library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .unwrap();
+        let saved = library
+            .list()
+            .unwrap()
+            .into_iter()
+            .find(|b| b.last_read_at == Some(123))
+            .unwrap();
+        assert_eq!(saved.reading_status, "read");
+        assert_eq!(saved.last_index, 4);
+    }
+
+    #[test]
+    fn source_changes_recompute_auto_status_without_losing_metadata() {
+        let f = Fixture::new();
+        let library = f.library();
+        let b = library.register(&f.book()).unwrap();
+        let prefs = ReaderPreferences::default();
+        library.favorite(b.id, true).unwrap();
+        let details = BookDetails {
+            custom_title: "Custom".into(),
+            series: "Series".into(),
+            volume: "2".into(),
+            notes: "Notes".into(),
+        };
+        library.edit_details(b.id, &details).unwrap();
+        let tag = library.create_tag("Tag").unwrap();
+        library.assign_tag(&[b.id], tag.id, true).unwrap();
+        library.save_progress(b.id, 2, "10.png", &prefs).unwrap();
+        let original = library.get(b.id).unwrap();
+        assert_eq!(original.reading_status, "read");
+        image::RgbImage::from_pixel(20, 30, image::Rgb([20, 30, 40]))
+            .save(f.0.join("pages/11.png"))
+            .unwrap();
+        library.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_reconcile BEFORE UPDATE OF reading_status ON books BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+        assert!(library.register(&f.book()).is_err());
+        assert_eq!(
+            serde_json::to_value(library.get(b.id).unwrap()).unwrap(),
+            serde_json::to_value(&original).unwrap()
+        );
+        library
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_reconcile;")
+            .unwrap();
+        let expanded = library.register(&f.book()).unwrap();
+        assert_eq!(
+            (
+                expanded.page_count,
+                expanded.last_index,
+                expanded.reading_status.as_str()
+            ),
+            (4, 2, "reading")
+        );
+        // Insert ahead of the saved page: registration must resume by name.
+        std::fs::copy(f.0.join("pages/1.png"), f.0.join("pages/0.png")).unwrap();
+        let relocated = library.register(&f.book()).unwrap();
+        assert_eq!(
+            (relocated.last_index, relocated.last_page_name.as_deref()),
+            (3, Some("10.png"))
+        );
+        std::fs::create_dir(f.0.join("short")).unwrap();
+        for name in ["1.png", "2.png", "10.png"] {
+            std::fs::copy(f.0.join("pages").join(name), f.0.join("short").join(name)).unwrap();
+        }
+        let short = book::open(f.0.join("short").to_str().unwrap())
+            .unwrap()
+            .book;
+        library.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_reconcile BEFORE UPDATE OF reading_status ON books BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+        assert!(library.relink(b.id, &short).is_err());
+        assert_eq!(
+            serde_json::to_value(library.get(b.id).unwrap()).unwrap(),
+            serde_json::to_value(&relocated).unwrap()
+        );
+        library
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_reconcile;")
+            .unwrap();
+        let linked = library.relink(b.id, &short).unwrap();
+        assert_eq!(
+            (
+                linked.page_count,
+                linked.last_index,
+                linked.reading_status.as_str()
+            ),
+            (3, 2, "read")
+        );
+        for saved in [expanded, relocated, linked] {
+            assert_eq!(saved.id, original.id);
+            assert_eq!(saved.favorite, original.favorite);
+            assert_eq!(saved.last_read_at, original.last_read_at);
+            assert_eq!(saved.preferences, original.preferences);
+            assert_eq!(saved.custom_title, details.custom_title);
+            assert_eq!(saved.series, details.series);
+            assert_eq!(saved.volume, details.volume);
+            assert_eq!(saved.notes, details.notes);
+            assert_eq!(saved.tags[0], tag);
+        }
+        // Missing saved page: clamp to the shorter source's valid index.
+        std::fs::remove_file(f.0.join("short/10.png")).unwrap();
+        let shrunk = library
+            .register(
+                &book::open(f.0.join("short").to_str().unwrap())
+                    .unwrap()
+                    .book,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                shrunk.last_index,
+                shrunk.last_page_name.as_deref(),
+                shrunk.reading_status.as_str()
+            ),
+            (1, Some("2.png"), "read")
+        );
+        for manual in ["read", "unread"] {
+            library.set_status(&[b.id], manual).unwrap();
+            assert_eq!(
+                library.relink(b.id, &f.book()).unwrap().reading_status,
+                manual
+            );
+            assert_eq!(library.register(&f.book()).unwrap().reading_status, manual);
+        }
+    }
+
+    #[test]
     fn large_offline_library_restores_checks_sources_and_exports() {
         let f = Fixture::new();
         let library = f.library();
@@ -1040,8 +1267,14 @@ mod tests {
         let conn = Connection::open(directory.join("library.sqlite3")).unwrap();
         conn.execute_batch("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,path TEXT NOT NULL UNIQUE,title TEXT NOT NULL,format TEXT NOT NULL,page_count INTEGER NOT NULL,favorite INTEGER NOT NULL DEFAULT 0,last_index INTEGER NOT NULL DEFAULT 0,last_page_name TEXT,last_read_at INTEGER,preferences TEXT NOT NULL,created_at INTEGER NOT NULL); PRAGMA user_version=1;").unwrap();
         conn.execute("INSERT INTO books(id,path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(42,?1,'legacy','folder',3,1,1,'2.png',123,?2,1)",params![f.0.join("pages").to_string_lossy(),serde_json::to_string(&ReaderPreferences::default()).unwrap()]).unwrap();
+        let double = ReaderPreferences {
+            page_mode: "double".into(),
+            ..Default::default()
+        };
+        conn.execute("INSERT INTO books(id,path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(43,?1,'legacy-double','folder',6,1,4,'5.png',123,?2,1)",params![f.0.join("offline-double").to_string_lossy(),serde_json::to_string(&double).unwrap()]).unwrap();
         drop(conn);
         let library = Library::open(&directory).unwrap();
+        assert_eq!(library.get(43).unwrap().reading_status, "read");
         let b = library.get(42).unwrap();
         assert!(b.favorite);
         assert_eq!(b.last_index, 1);

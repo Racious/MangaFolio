@@ -51,13 +51,89 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<(), String> {
         ALTER TABLE books ADD COLUMN notes TEXT NOT NULL DEFAULT '';
         ALTER TABLE books ADD COLUMN reading_status TEXT NOT NULL DEFAULT 'unread' CHECK(reading_status IN ('unread','reading','read'));
         ALTER TABLE books ADD COLUMN status_manual INTEGER NOT NULL DEFAULT 0;
-        UPDATE books SET reading_status=CASE WHEN last_read_at IS NULL THEN 'unread' WHEN last_index>=page_count-1 THEN 'read' ELSE 'reading' END;
         CREATE TABLE tags(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE);
         CREATE TABLE book_tags(book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE, tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY(book_id,tag_id));
         CREATE INDEX book_tags_tag ON book_tags(tag_id,book_id);
         PRAGMA user_version=2;").map_err(db_error)?;
+    let books = {
+        let mut query = tx
+            .prepare(&format!("SELECT {COLUMNS} FROM books"))
+            .map_err(db_error)?;
+        let rows = query.query_map([], row_book).map_err(db_error)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(db_error)?
+    };
+    for book in books {
+        let status = automatic_status(
+            book.last_index,
+            book.page_count,
+            book.last_read_at,
+            &book.preferences,
+        );
+        tx.execute(
+            "UPDATE books SET reading_status=?1 WHERE id=?2",
+            params![status, book.id],
+        )
+        .map_err(db_error)?;
+    }
     tx.commit().map_err(db_error)
 }
+/// Matches reader pairStartOf/indicesOf; keep the saved spread-start index unchanged.
+pub(super) fn automatic_status(
+    index: usize,
+    count: usize,
+    last_read: Option<i64>,
+    prefs: &ReaderPreferences,
+) -> &'static str {
+    if last_read.is_none() {
+        return "unread";
+    }
+    let start = if prefs.page_mode != "double" {
+        index
+    } else if prefs.double_cover {
+        if index == 0 {
+            0
+        } else {
+            index - ((index - 1) % 2)
+        }
+    } else {
+        index - (index % 2)
+    };
+    let end = if prefs.page_mode == "double" && !(prefs.double_cover && start == 0) {
+        start.saturating_add(1)
+    } else {
+        start
+    };
+    if end >= count.saturating_sub(1) {
+        "read"
+    } else {
+        "reading"
+    }
+}
+
+/// Reconcile changed source pages and automatic status in the caller's transaction.
+pub(super) fn reconcile_source(conn: &Connection, id: i64, pages: &[String]) -> Result<(), String> {
+    let saved = conn
+        .query_row(
+            &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
+            [id],
+            row_book,
+        )
+        .map_err(db_error)?;
+    let index = resume_index(&saved, pages);
+    let page_name = saved.last_page_name.as_ref().map(|_| pages[index].clone());
+    let status = if saved.status_manual {
+        saved.reading_status.as_str()
+    } else {
+        automatic_status(index, pages.len(), saved.last_read_at, &saved.preferences)
+    };
+    conn.execute(
+        "UPDATE books SET last_index=?1,last_page_name=?2,reading_status=?3 WHERE id=?4",
+        params![index, page_name, status, id],
+    )
+    .map_err(db_error)?;
+    Ok(())
+}
+
 impl Library {
     pub fn edit_details(&self, id: i64, details: &BookDetails) -> Result<LibraryBook, String> {
         details.validate()?;
@@ -91,10 +167,36 @@ impl Library {
         let tx = conn.transaction().map_err(db_error)?;
         for id in ids {
             let count = if status == "auto" {
-                tx.execute("UPDATE books SET status_manual=0,reading_status=CASE WHEN last_read_at IS NULL THEN 'unread' WHEN last_index>=page_count-1 THEN 'read' ELSE 'reading' END WHERE id=?1", [id])
+                let saved = tx
+                    .query_row(
+                        &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
+                        [id],
+                        row_book,
+                    )
+                    .optional()
+                    .map_err(db_error)?;
+                let status = saved
+                    .as_ref()
+                    .map(|book| {
+                        automatic_status(
+                            book.last_index,
+                            book.page_count,
+                            book.last_read_at,
+                            &book.preferences,
+                        )
+                    })
+                    .unwrap_or("unread");
+                tx.execute(
+                    "UPDATE books SET status_manual=0,reading_status=?1 WHERE id=?2",
+                    params![status, id],
+                )
             } else {
-                tx.execute("UPDATE books SET reading_status=?1,status_manual=1 WHERE id=?2", params![status,id])
-            }.map_err(db_error)?;
+                tx.execute(
+                    "UPDATE books SET reading_status=?1,status_manual=1 WHERE id=?2",
+                    params![status, id],
+                )
+            }
+            .map_err(db_error)?;
             if count != 1 {
                 return Err("部分書籍已不存在，未修改任何閱讀狀態。".into());
             }
