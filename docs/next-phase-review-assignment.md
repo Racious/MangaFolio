@@ -2,7 +2,9 @@
 
 Repository：Racious/MangaFolio。分支：`feature/library-management-ui`。
 固定開發基準：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8`。
-最終產品提交：將於產品 commit 後由單獨文件提交固定於本欄；不以浮動 HEAD 代替審查範圍。
+最終產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
+固定本輪範圍：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8` → `08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
+本文件固定 SHA 與原始測試 .log 的保存由後續單獨文件提交補齊，不變更產品程式。文件提交 SHA 可用 `git log -1 -- docs/next-phase-review-assignment.md` 核對，不能代替上述產品範圍。
 產品包含原 A／R1／R2 修正 `878d2bb6918fe1adbf1b0d394dbec6f6f478bdd3`；原完整修正範圍 `7f095125c5fa9fff1cc74446458d0ac4dc6fc229` → `878d2bb6918fe1adbf1b0d394dbec6f6f478bdd3`。
 
 ## 任務與授權邊界

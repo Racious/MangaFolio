@@ -60,3 +60,5 @@
 - Linux 原生資訊編輯、續讀／返回及三種風格畫面；全部資料與來源在 /tmp/mangafolio-next-phase-native/，未碰使用者實際資料庫。
 - Windows cfg／native、原生選檔全矩陣、原生 IME／高 DPI／螢幕閱讀器及 UNC 效能未執行，清楚交辦。未合併 main／force push／發版。
 - 最終產品與文件提交 SHA 於產品提交後由獨立文件提交固定於 next-phase-review-assignment.md；交付材料包括實際程式、原審查、計畫／驗證／審查交辦及畫面證據。
+
+- 產品提交 `08ccc3e447372ade1834e8d3d63cabc8df23c5b0`；後續文件提交固定 SHA 並明確納入既有忽略規則下的完整 .log 測試輸出，不改產品。

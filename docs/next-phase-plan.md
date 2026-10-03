@@ -34,3 +34,5 @@
 設計示意位於 `images/next-phase/directions/`：靜謐書架（暖白茶綠）、目錄工作台（冷白藍）、夜讀書房（炭灰暖金）。示意中的作者搜尋與失效數字不列入產品規格。實作畫面在 `implemented/`；原生畫面在 `native-implemented/`，樣本漫畫為隔離測試圖片，不包含使用者資料。
 
 不新增書籤、雲端、帳號、付費、背景監控／全碟掃描。未合併 main、force push、打包、簽章或發布。最終固定提交及審查要求見 `next-phase-review-assignment.md`。
+
+最終產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。後續提交僅固定交辦 SHA 及補入被既有 *.log 規則忽略的原始測試輸出，不改產品程式。

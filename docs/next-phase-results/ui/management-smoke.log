@@ -1,0 +1,1 @@
+Management UI smoke passed: batch selection/favorites, filter selection preservation, canceled/failed/successful removal, active-reader flush/discard, relink, export, invalid/valid restore, 640px layout. Tauri IPC was mocked.
