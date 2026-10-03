@@ -46,3 +46,5 @@ Linux GTK 選檔本次已開啟並輸入隔離目錄，但清單未能列出／O
 Windows native／WebView2、cfg(windows) 測試、磁碟／verbatim／UNC 上下線、原生多檔選擇及匯入取消重試、備份選檔完整流程、原生中文 IME、螢幕閱讀器與高 DPI、Windows 大型書庫／網路來源耗時、系統明暗切換均待 Windows 矩陣實驗。Browser 組字事件不是實際輸入法驗收。Linux 的原生資訊編輯與閱讀證據不替代這些流程。
 
 未打包、簽章、發布或合併 main。schema v2 無降級遷移，回退需使用升級前備份；備份不含漫畫及外觀偏好。詳細驗收步驟見 [審查交辦](next-phase-review-assignment.md)。
+
+完整原始 .log 保留測試工具輸出的尾端空行；本結果目錄 .gitattributes 僅允許 .log 尾端空行，不調整程式碼 whitespace 檢查。固定開發基準到最終文件提交的 diff --check 另行核對。
