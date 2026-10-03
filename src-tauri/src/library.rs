@@ -54,7 +54,7 @@ impl ReaderPreferences {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryBook {
     pub id: i64,
@@ -237,8 +237,8 @@ impl Library {
     }
 
     pub fn cover(&self, id: i64) -> Result<Vec<u8>, String> {
-        let entry = self.get(id)?;
         let _guard = self.cover_lock.lock().map_err(db_error)?;
+        let entry = self.get(id)?;
         let opened = book::open(&entry.path)?;
         let source = Path::new(&entry.path);
         let first = if source.is_dir() {
@@ -248,7 +248,8 @@ impl Library {
         };
         let metadata = std::fs::metadata(first).map_err(db_error)?;
         let stamp = format!(
-            "{}-{}",
+            "{}-{}-{}",
+            entry.path,
             metadata.len(),
             metadata
                 .modified()
@@ -281,6 +282,284 @@ impl Library {
         std::fs::write(stamp_file, stamp).map_err(db_error)?;
         Ok(bytes)
     }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LibraryBackup {
+    pub application: String,
+    pub version: u32,
+    pub books: Vec<LibraryBook>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreResult {
+    pub added: usize,
+    pub skipped: usize,
+}
+
+const MAX_BACKUP_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_BACKUP_BOOKS: usize = 10_000;
+
+impl Library {
+    pub fn remove(&self, ids: &[i64]) -> Result<(), String> {
+        validate_ids(ids)?;
+        let _cover_guard = self.cover_lock.lock().map_err(db_error)?;
+        let mut connection = self.connection.lock().map_err(db_error)?;
+        let transaction = connection.transaction().map_err(db_error)?;
+        for id in ids {
+            if transaction
+                .execute("DELETE FROM books WHERE id=?1", [id])
+                .map_err(db_error)?
+                != 1
+            {
+                return Err("部分書籍已不存在，未移除任何項目；請重新載入。".into());
+            }
+        }
+        transaction.commit().map_err(db_error)?;
+        // Only discard our own cache; never delete a source. IDs are not reused.
+        for id in ids {
+            for extension in ["png", "stamp", "tmp"] {
+                let _ = std::fs::remove_file(self.covers.join(format!("{id}.{extension}")));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn favorite_many(&self, ids: &[i64], favorite: bool) -> Result<(), String> {
+        validate_ids(ids)?;
+        let mut connection = self.connection.lock().map_err(db_error)?;
+        let transaction = connection.transaction().map_err(db_error)?;
+        for id in ids {
+            if transaction
+                .execute(
+                    "UPDATE books SET favorite=?1 WHERE id=?2",
+                    params![favorite, id],
+                )
+                .map_err(db_error)?
+                != 1
+            {
+                return Err("部分書籍已不存在，未修改任何收藏；請重新載入。".into());
+            }
+        }
+        transaction.commit().map_err(db_error)
+    }
+
+    pub fn relink(&self, id: i64, book: &book::Book) -> Result<LibraryBook, String> {
+        let path = book
+            .source_path()
+            .canonicalize()
+            .map_err(db_error)?
+            .to_string_lossy()
+            .into_owned();
+        let _cover_guard = self.cover_lock.lock().map_err(db_error)?;
+        let mut connection = self.connection.lock().map_err(db_error)?;
+        let transaction = connection.transaction().map_err(db_error)?;
+        let saved = transaction
+            .query_row(
+                &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
+                [id],
+                row_book,
+            )
+            .map_err(db_error)?;
+        let duplicate: Option<i64> = transaction
+            .query_row(
+                "SELECT id FROM books WHERE path=?1 AND id<>?2",
+                params![path, id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(db_error)?;
+        if duplicate.is_some() {
+            return Err("這個來源已在書庫中，請選擇其他來源。".into());
+        }
+        let pages = book.page_names();
+        let index = resume_index(&saved, &pages);
+        let page_name = saved.last_page_name.as_ref().map(|_| pages[index].clone());
+        transaction.execute("UPDATE books SET path=?1,title=?2,format=?3,page_count=?4,last_index=?5,last_page_name=?6 WHERE id=?7", params![path, book.title, book.format(), book.len(), index, page_name, id]).map_err(db_error)?;
+        let updated = transaction
+            .query_row(
+                &format!("SELECT {COLUMNS} FROM books WHERE id=?1"),
+                [id],
+                row_book,
+            )
+            .map_err(db_error)?;
+        transaction.commit().map_err(db_error)?;
+        Ok(updated)
+    }
+
+    pub fn backup_json(&self) -> Result<Vec<u8>, String> {
+        let books = self.list()?;
+        if books.len() > MAX_BACKUP_BOOKS {
+            return Err("備份最多支援 10,000 本書。".into());
+        }
+        let bytes = serde_json::to_vec_pretty(&LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 1,
+            books,
+        })
+        .map_err(db_error)?;
+        if bytes.len() as u64 > MAX_BACKUP_BYTES {
+            return Err("備份超過 16 MiB，無法匯出。".into());
+        }
+        Ok(bytes)
+    }
+
+    pub fn export_to(&self, path: &Path) -> Result<(), String> {
+        use std::io::Write;
+        let bytes = self.backup_json()?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|e| format!("無法建立備份（不覆寫既有檔案，請選擇新檔名）：{e}"))?;
+        let result = file.write_all(&bytes).and_then(|_| file.sync_all());
+        if let Err(error) = result {
+            drop(file);
+            let _ = std::fs::remove_file(path);
+            return Err(db_error(error));
+        }
+        Ok(())
+    }
+
+    pub fn restore_json(&self, bytes: &[u8]) -> Result<RestoreResult, String> {
+        if bytes.len() as u64 > MAX_BACKUP_BYTES {
+            return Err("備份超過 16 MiB。".into());
+        }
+        let backup: LibraryBackup =
+            serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
+        if backup.application != "MangaFolio"
+            || backup.version != 1
+            || backup.books.len() > MAX_BACKUP_BOOKS
+        {
+            return Err("不支援的備份格式、版本或書籍數量。".into());
+        }
+        let mut paths = std::collections::HashSet::new();
+        for book in &backup.books {
+            book.preferences.validate()?;
+            let path = book.path.as_bytes();
+            let absolute = Path::new(&book.path).is_absolute()
+                || (path.len() > 2
+                    && path[0].is_ascii_alphabetic()
+                    && path[1] == b':'
+                    && [b'/', b'\\'].contains(&path[2]))
+                || book.path.starts_with("\\\\");
+            if !absolute
+                || book.path.contains('\0')
+                || book.path.len() > 32_768
+                || book.title.is_empty()
+                || book.title.len() > 4096
+                || !["folder", "cbz"].contains(&book.format.as_str())
+                || book.page_count == 0
+                || book.page_count > 1_000_000
+                || book.last_index >= book.page_count
+                || book
+                    .last_page_name
+                    .as_ref()
+                    .is_some_and(|s| s.len() > 32_768)
+                || book.last_read_at.is_some_and(|t| t < 0)
+                || !paths.insert(book.path.clone())
+            {
+                return Err("備份含無效或重複的書籍資料，未還原任何項目。".into());
+            }
+        }
+        let mut connection = self.connection.lock().map_err(db_error)?;
+        let transaction = connection.transaction().map_err(db_error)?;
+        let mut result = RestoreResult {
+            added: 0,
+            skipped: 0,
+        };
+        for book in backup.books {
+            // New IDs are generated; existing paths keep their current metadata.
+            let preferences = serde_json::to_string(&book.preferences).map_err(db_error)?;
+            let added = transaction.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(path) DO NOTHING", params![book.path, book.title, book.format, book.page_count, book.favorite, book.last_index, book.last_page_name, book.last_read_at, preferences, now()]).map_err(db_error)?;
+            if added == 1 {
+                result.added += 1;
+            } else {
+                result.skipped += 1;
+            }
+        }
+        transaction.commit().map_err(db_error)?;
+        Ok(result)
+    }
+}
+
+fn validate_ids(ids: &[i64]) -> Result<(), String> {
+    let unique: std::collections::HashSet<_> = ids.iter().collect();
+    if ids.is_empty()
+        || ids.len() > MAX_BACKUP_BOOKS
+        || ids.iter().any(|id| *id <= 0)
+        || unique.len() != ids.len()
+    {
+        return Err("請選擇 1 至 10,000 本不重複的書籍。".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_library_books(ids: Vec<i64>, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || app.state::<Library>().remove(&ids))
+        .await
+        .map_err(db_error)?
+}
+
+#[tauri::command]
+pub async fn favorite_library_books(
+    ids: Vec<i64>,
+    favorite: bool,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<Library>().favorite_many(&ids, favorite)
+    })
+    .await
+    .map_err(db_error)?
+}
+
+#[tauri::command]
+pub async fn relink_library_book(
+    id: i64,
+    path: String,
+    app: tauri::AppHandle,
+) -> Result<LibraryBook, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        let opened = book::open(&path)?;
+        app.state::<Library>().relink(id, &opened.book)
+    })
+    .await
+    .map_err(db_error)?
+}
+
+#[tauri::command]
+pub async fn export_library_backup(path: String, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || app.state::<Library>().export_to(Path::new(&path)))
+        .await
+        .map_err(db_error)?
+}
+
+#[tauri::command]
+pub async fn restore_library_backup(
+    path: String,
+    app: tauri::AppHandle,
+) -> Result<RestoreResult, String> {
+    use std::io::Read;
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)
+            .map_err(db_error)?
+            .take(MAX_BACKUP_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(db_error)?;
+        app.state::<Library>().restore_json(&bytes)
+    })
+    .await
+    .map_err(db_error)?
 }
 
 pub fn resume_index(saved: &LibraryBook, pages: &[String]) -> usize {
@@ -483,6 +762,163 @@ mod tests {
             .unwrap();
         drop(library);
         assert!(f.library_result().is_err());
+    }
+
+    #[test]
+    fn batch_mutations_are_atomic_and_never_delete_sources() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        assert!(library
+            .favorite_many(&[entry.id, entry.id + 1], true)
+            .is_err());
+        assert!(!library.get(entry.id).unwrap().favorite);
+        assert!(library.remove(&[entry.id, entry.id + 1]).is_err());
+        assert!(library.get(entry.id).is_ok());
+        assert!(library.remove(&[entry.id, entry.id]).is_err());
+        library.favorite_many(&[entry.id], true).unwrap();
+        library.cover(entry.id).unwrap();
+        library.remove(&[entry.id]).unwrap();
+        assert!(library.list().unwrap().is_empty());
+        assert!(f.0.join("pages/1.png").exists());
+        assert!(!f.0.join(format!("data/covers/{}.png", entry.id)).exists());
+        assert!(library.register(&f.book()).unwrap().id > entry.id);
+    }
+
+    #[test]
+    fn relink_preserves_identity_preferences_and_matches_page_name() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        let prefs = ReaderPreferences {
+            direction: "ltr".into(),
+            ..Default::default()
+        };
+        library.favorite(entry.id, true).unwrap();
+        library.save_progress(entry.id, 1, "2.png", &prefs).unwrap();
+        let before = library.get(entry.id).unwrap();
+        std::fs::rename(f.0.join("pages"), f.0.join("moved")).unwrap();
+        image::RgbImage::new(20, 30)
+            .save(f.0.join("moved/0.png"))
+            .unwrap();
+        let new_book = book::open(f.0.join("moved").to_str().unwrap())
+            .unwrap()
+            .book;
+        let updated = library.relink(entry.id, &new_book).unwrap();
+        assert_eq!(updated.id, entry.id);
+        assert!(updated.favorite && updated.available);
+        assert_eq!(updated.preferences, prefs);
+        assert_eq!(updated.last_read_at, before.last_read_at);
+        assert_eq!(updated.last_index, 2);
+        assert_eq!(updated.last_page_name.as_deref(), Some("2.png"));
+    }
+
+    #[test]
+    fn relink_conflict_keeps_both_entries_intact() {
+        let f = Fixture::new();
+        let other = Fixture::new();
+        let library = f.library();
+        let first = library.register(&f.book()).unwrap();
+        let second = library.register(&other.book()).unwrap();
+        assert!(library.relink(first.id, &other.book()).is_err());
+        assert_eq!(library.get(first.id).unwrap().path, first.path);
+        assert_eq!(library.get(second.id).unwrap().path, second.path);
+    }
+
+    #[test]
+    fn backup_roundtrip_merge_preserves_existing_and_restores_offline_metadata() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        library.favorite(entry.id, true).unwrap();
+        library
+            .save_progress(entry.id, 1, "2.png", &ReaderPreferences::default())
+            .unwrap();
+        let bytes = library.backup_json().unwrap();
+        library.favorite(entry.id, false).unwrap();
+        let merge = library.restore_json(&bytes).unwrap();
+        assert_eq!((merge.added, merge.skipped), (0, 1));
+        assert!(!library.get(entry.id).unwrap().favorite);
+        library.remove(&[entry.id]).unwrap();
+        std::fs::remove_dir_all(f.0.join("pages")).unwrap();
+        let result = library.restore_json(&bytes).unwrap();
+        assert_eq!((result.added, result.skipped), (1, 0));
+        drop(library);
+        let restored = f.library().list().unwrap().pop().unwrap();
+        assert!(restored.favorite && !restored.available);
+        assert_eq!(restored.last_index, 1);
+        assert_ne!(restored.id, entry.id);
+    }
+
+    #[test]
+    fn invalid_backup_cannot_partially_restore_or_change_existing() {
+        let f = Fixture::new();
+        let other = Fixture::new();
+        let library = f.library();
+        let mut entries = vec![
+            library.register(&f.book()).unwrap(),
+            library.register(&other.book()).unwrap(),
+        ];
+        library.remove(&[entries[1].id]).unwrap();
+        entries[0].favorite = true;
+        entries[1].preferences.zoom = "bad".into();
+        let backup = LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 1,
+            books: entries,
+        };
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.list().unwrap().len(), 1);
+        assert!(!library.list().unwrap()[0].favorite);
+        assert!(library.restore_json(b"{not-json}").is_err());
+        assert!(library
+            .restore_json(&vec![b' '; MAX_BACKUP_BYTES as usize + 1])
+            .is_err());
+    }
+
+    #[test]
+    fn backup_rejects_future_version_duplicates_and_invalid_paths() {
+        let f = Fixture::new();
+        let library = f.library();
+        let entry = library.register(&f.book()).unwrap();
+        let mut backup = LibraryBackup {
+            application: "MangaFolio".into(),
+            version: 2,
+            books: vec![entry.clone()],
+        };
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        backup.version = 1;
+        backup.books.push(entry);
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        backup.books.pop();
+        backup.books[0].path = "relative/book.cbz".into();
+        assert!(library
+            .restore_json(&serde_json::to_vec(&backup).unwrap())
+            .is_err());
+        assert_eq!(library.list().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn export_writes_valid_backup_and_refuses_to_overwrite_sources_or_backup() {
+        let f = Fixture::new();
+        let library = f.library();
+        library.register(&f.book()).unwrap();
+        let destination = f.0.join("backup.json");
+        library.export_to(&destination).unwrap();
+        let bytes = std::fs::read(&destination).unwrap();
+        assert!(library.export_to(&destination).is_err());
+        assert_eq!(std::fs::read(&destination).unwrap(), bytes);
+        assert_eq!(library.restore_json(&bytes).unwrap().skipped, 1);
+        let source = f.0.join("pages/1.png");
+        let original = std::fs::read(&source).unwrap();
+        assert!(library.export_to(&source).is_err());
+        assert_eq!(std::fs::read(&source).unwrap(), original);
     }
     impl Fixture {
         fn library_result(&self) -> Result<Library, String> {

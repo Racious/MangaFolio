@@ -51,6 +51,10 @@ onMounted(async () => {
     const window = getCurrentWindow();
     const unlisten = await window.onCloseRequested(async (event) => {
       event.preventDefault();
+      if (library.managing) {
+        library.error = "書庫操作進行中，請完成後再關閉視窗。";
+        return;
+      }
       if (closing) return;
       closing = true;
       try {

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import BookCard from "./BookCard.vue";
 import LibraryGuide from "./LibraryGuide.vue";
+import LibraryManager from "./LibraryManager.vue";
 import { useLibraryStore, type LibraryFilter } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 import { pickBookFiles } from "../api/library";
@@ -12,6 +13,12 @@ const library = useLibraryStore();
 const reader = useReaderStore();
 const limit = ref(60);
 const guideTarget = ref("");
+const managementOpen = ref(false);
+const selectedIds = ref<number[]>([]);
+const busy = computed(
+  () =>
+    library.managing || library.importing || library.loading || reader.loading,
+);
 const sort = ref<"recent" | "title">("recent");
 const filters: { id: LibraryFilter; label: string }[] = [
   { id: "all", label: "全部書籍" },
@@ -21,9 +28,10 @@ const filters: { id: LibraryFilter; label: string }[] = [
 const sortedBooks = computed(() => sortBooks(library.visibleBooks, sort.value));
 const shownBooks = computed(() => sortedBooks.value.slice(0, limit.value));
 watch(
-  () => [library.query, library.filter, sort.value],
+  () => [library.query, library.filter, sort.value, managementOpen.value],
   () => {
     limit.value = 60;
+    selectedIds.value = [];
   },
 );
 async function addFiles() {
@@ -43,8 +51,23 @@ async function addFolder() {
   }
 }
 async function openBook(id: number) {
+  if (busy.value) return;
   if (await reader.openBook(id)) library.screen = "reader";
 }
+function selectBook(id: number) {
+  if (busy.value) return;
+  selectedIds.value = selectedIds.value.includes(id)
+    ? selectedIds.value.filter((selected) => selected !== id)
+    : [...selectedIds.value, id];
+}
+watch(
+  () => library.books,
+  () => {
+    selectedIds.value = selectedIds.value.filter((id) =>
+      library.books.some((book) => book.id === id),
+    );
+  },
+);
 </script>
 
 <template>
@@ -59,34 +82,37 @@ async function openBook(id: number) {
         class="import-actions"
         :class="{ 'guide-highlight': guideTarget === 'import' }"
       >
-        <button
-          class="primary"
-          :disabled="library.importing || reader.loading"
-          @click="addFiles"
-        >
+        <button class="primary" :disabled="busy" @click="addFiles">
           {{ library.importing ? "加入中…" : "＋ 加入 ZIP／CBZ" }}
         </button>
-        <button
-          :disabled="library.importing || reader.loading"
-          @click="addFolder"
-        >
-          加入圖片資料夾
-        </button>
+        <button :disabled="busy" @click="addFolder">加入圖片資料夾</button>
         <button
           v-if="reader.hasBook"
-          :disabled="reader.loading"
+          :disabled="busy"
           @click="library.screen = 'reader'"
         >
           返回閱讀
         </button>
+        <button
+          :disabled="busy"
+          :aria-expanded="managementOpen"
+          @click="managementOpen = !managementOpen"
+        >
+          {{ managementOpen ? "收合管理" : "管理與備份" }}
+        </button>
       </div>
     </header>
     <LibraryGuide @highlight="guideTarget = $event" />
+    <LibraryManager
+      v-if="managementOpen"
+      :selected-ids="selectedIds"
+      :shown-count="shownBooks.length"
+      @clear="selectedIds = []"
+      @select-shown="selectedIds = shownBooks.map((book) => book.id)"
+    />
     <p v-if="library.error" class="notice error" role="alert">
       {{ library.error }}
-      <button :disabled="library.loading" @click="library.refresh">
-        重新載入書庫
-      </button>
+      <button :disabled="busy" @click="library.refresh">重新載入書庫</button>
     </p>
     <p v-if="reader.error" class="notice error" role="alert">
       {{ reader.error }}
@@ -114,7 +140,7 @@ async function openBook(id: number) {
       </div>
       <button
         class="primary"
-        :disabled="reader.loading"
+        :disabled="busy"
         @click="openBook(library.continueBook.id)"
       >
         繼續閱讀 →
@@ -131,6 +157,7 @@ async function openBook(id: number) {
             (guideTarget === 'recent' && filter.id === 'recent')
           "
           :aria-pressed="library.filter === filter.id"
+          :disabled="library.managing"
           @click="library.filter = filter.id"
         >
           {{ filter.label
@@ -151,10 +178,15 @@ async function openBook(id: number) {
           ><span aria-hidden="true">⌕</span
           ><input
             v-model="library.query"
+            :disabled="library.managing"
             type="search"
             placeholder="搜尋書名…"
             aria-label="搜尋書名" /></label
-        ><select v-model="sort" aria-label="書籍排序">
+        ><select
+          v-model="sort"
+          :disabled="library.managing"
+          aria-label="書籍排序"
+        >
           <option value="recent">最近閱讀／加入</option>
           <option value="title">書名排序</option>
         </select>
@@ -172,7 +204,7 @@ async function openBook(id: number) {
       <p>
         支援 ZIP、CBZ，以及直接包含圖片的資料夾。<br />原始檔案留在原位，閱讀進度與收藏保存在這台電腦。
       </p>
-      <button class="primary" :disabled="library.importing" @click="addFiles">
+      <button class="primary" :disabled="busy" @click="addFiles">
         加入漫畫
       </button>
     </section>
@@ -213,15 +245,19 @@ async function openBook(id: number) {
           v-for="book in shownBooks"
           :key="`${book.id}:${library.revision}`"
           :book="book"
-          :opening="reader.loading"
-          :favorite-pending="library.favoritePending.has(book.id)"
+          :opening="busy"
+          :favorite-pending="busy || library.favoritePending.has(book.id)"
+          :selectable="managementOpen"
+          :selected="selectedIds.includes(book.id)"
           @open="openBook"
           @favorite="library.toggleFavorite"
+          @select="selectBook"
         />
       </section>
       <button
         v-if="limit < sortedBooks.length"
         class="load-more"
+        :disabled="busy"
         @click="limit += 60"
       >
         顯示更多書籍

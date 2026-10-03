@@ -7,10 +7,13 @@ const props = defineProps<{
   book: LibraryBook;
   opening: boolean;
   favoritePending: boolean;
+  selectable?: boolean;
+  selected?: boolean;
 }>();
 const emit = defineEmits<{
   open: [id: number];
   favorite: [book: LibraryBook];
+  select: [id: number];
 }>();
 const element = ref<HTMLElement | null>(null);
 const cover = ref<string | null>(null);
@@ -52,6 +55,16 @@ onUnmounted(() => {
     class="book-card"
     :class="{ offline: !book.available }"
   >
+    <label v-if="selectable" class="selection">
+      <input
+        type="checkbox"
+        :checked="selected"
+        :disabled="opening"
+        :aria-label="`選取：${book.title}`"
+        @change="emit('select', book.id)"
+      />
+      選取
+    </label>
     <button
       class="cover"
       :disabled="opening || !book.available"
@@ -112,6 +125,18 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.selection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  font-size: 12px;
+}
+.selection input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
 .book-card {
   min-width: 0;
   background: var(--bg-soft);

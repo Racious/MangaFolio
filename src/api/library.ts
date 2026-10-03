@@ -41,6 +41,18 @@ export const saveProgress = (progress: ReadingProgress) =>
   invoke<void>("save_reading_progress", { ...progress });
 export const coverBytes = (id: number) =>
   invoke<ArrayBuffer>("library_cover", { id });
+export const removeBooks = (ids: number[]) =>
+  invoke<void>("remove_library_books", { ids });
+export const favoriteBooks = (ids: number[], favorite: boolean) =>
+  invoke<void>("favorite_library_books", { ids, favorite });
+export const relinkBook = (id: number, path: string) =>
+  invoke<LibraryBook>("relink_library_book", { id, path });
+export const exportBackup = (path: string) =>
+  invoke<void>("export_library_backup", { path });
+export const restoreBackup = (path: string) =>
+  invoke<{ added: number; skipped: number }>("restore_library_backup", {
+    path,
+  });
 export async function pickBookFiles(): Promise<string[] | null> {
   return open({
     multiple: true,

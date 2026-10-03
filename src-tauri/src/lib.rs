@@ -31,7 +31,12 @@ pub fn run() {
             library::import_book,
             library::set_favorite,
             library::save_reading_progress,
-            library::library_cover
+            library::library_cover,
+            library::remove_library_books,
+            library::favorite_library_books,
+            library::relink_library_book,
+            library::export_library_backup,
+            library::restore_library_backup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

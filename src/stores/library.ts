@@ -17,6 +17,7 @@ export const useLibraryStore = defineStore("library", {
     revision: 0,
     loading: false,
     importing: false,
+    managing: false,
     error: "",
     importNotice: "",
     favoritePending: new Set<number>(),
@@ -46,7 +47,7 @@ export const useLibraryStore = defineStore("library", {
       }
     },
     async add(paths: string[]) {
-      if (this.importing) return;
+      if (this.importing || this.managing) return;
       this.importing = true;
       this.error = "";
       this.importNotice = "";
@@ -69,7 +70,8 @@ export const useLibraryStore = defineStore("library", {
       }
     },
     async toggleFavorite(book: LibraryBook) {
-      if (this.favoritePending.has(book.id)) return;
+      if (this.managing || this.importing || this.favoritePending.has(book.id))
+        return;
       this.favoritePending.add(book.id);
       this.error = "";
       try {

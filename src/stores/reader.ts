@@ -105,6 +105,21 @@ export const useReaderStore = defineStore("reader", {
   },
 
   actions: {
+    /** Called after a successfully removed/relinked active entry; never resave its old source. */
+    discardBook() {
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      this.renderToken++;
+      this.clearSlots();
+      this.bookId = null;
+      this.sessionId = 0;
+      this.pages = [];
+      this.title = "";
+      this.index = 0;
+      this.favorite = false;
+      this.error = "";
+      this.progressError = "";
+    },
     /** 頁碼 → 所屬跨頁起始頁碼。 */
     pairStart(index: number): number {
       return pairStartOf(index, this.pageMode === "double", this.doubleCover);
