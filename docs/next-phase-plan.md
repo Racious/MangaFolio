@@ -35,4 +35,6 @@
 
 不新增書籤、雲端、帳號、付費、背景監控／全碟掃描。未合併 main、force push、打包、簽章或發布。最終固定提交及審查要求見 `next-phase-review-assignment.md`。
 
-最終產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。後續提交僅固定交辦 SHA 及補入被既有 *.log 規則忽略的原始測試輸出，不改產品程式。
+首輪產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。後續提交僅固定交辦 SHA 及補入被既有 *.log 規則忽略的原始測試輸出，不改產品程式。
+
+原獨立審查確認 N1／N2，已修正並補回歸；最新產品 `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`，本次16／37項驗證通過，仍待獨立複審及 Windows 原生驗收。見 next-phase-review-fix-handoff.md。

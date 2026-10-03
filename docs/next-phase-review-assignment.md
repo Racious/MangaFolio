@@ -1,9 +1,11 @@
 # 下一階段獨立審查與實機驗收交辦
 
+**最新 N1／N2 修正產品：`10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`。** 本次固定範圍與新驗證見 [修正複審交辦](next-phase-review-fix-handoff.md)。原審查報告保留，修正仍待獨立複審與 Windows 原生驗收。
+
 Repository：Racious/MangaFolio。分支：`feature/library-management-ui`。
 固定開發基準：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8`。
-最終產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
-固定本輪範圍：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8` → `08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
+首輪產品提交：`08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
+固定首輪範圍：`bac9674f3b0d2a5c2e19774d5294d7cbfd2f86b8` → `08ccc3e447372ade1834e8d3d63cabc8df23c5b0`。
 本文件固定 SHA 與原始測試 .log 的保存由後續單獨文件提交補齊，不變更產品程式。文件提交 SHA 可用 `git log -1 -- docs/next-phase-review-assignment.md` 核對，不能代替上述產品範圍。
 產品包含原 A／R1／R2 修正 `878d2bb6918fe1adbf1b0d394dbec6f6f478bdd3`；原完整修正範圍 `7f095125c5fa9fff1cc74446458d0ac4dc6fc229` → `878d2bb6918fe1adbf1b0d394dbec6f6f478bdd3`。
 

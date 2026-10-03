@@ -10,6 +10,7 @@
 | [工作日誌](work-log.md) | 開發、環境問題、推送與文件整理的紀錄 |
 | [本地審查作業交辦單](review-assignment.md) | 可直接貼給 Claude／Codex 的任務、固定提交範圍、驗收與報告要求 |
 | [本輪開發計畫](next-phase-plan.md) | 固定基準、需求進度、schema／備份與外觀契約 |
+| [N1／N2 修正複審交辦](next-phase-review-fix-handoff.md) | 最新修正產品 SHA、16／37 項驗證及待實機複驗 |
 | [本輪驗證](next-phase-validation.md) | 實際測試輸出、畫面證據及未執行項目 |
 | [本輪審查交辦](next-phase-review-assignment.md) | 固定產品 SHA、獨立審查及 Windows 逐步驗收 |
 | [視覺自檢](../design-qa.md) | 實作與設計方向比較，非獨立審查 |

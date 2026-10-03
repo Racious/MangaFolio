@@ -62,3 +62,10 @@
 - 最終產品與文件提交 SHA 於產品提交後由獨立文件提交固定於 next-phase-review-assignment.md；交付材料包括實際程式、原審查、計畫／驗證／審查交辦及畫面證據。
 
 - 產品提交 `08ccc3e447372ade1834e8d3d63cabc8df23c5b0`；後續文件提交固定 SHA 並明確納入既有忽略規則下的完整 .log 測試輸出，不改產品。
+
+## 2026-10-03（Asia/Tokyo）：N1／N2 審查修正
+
+- 同步獨立報告提交1394670；修正雙頁末組自動已讀及來源頁數改變後陳舊狀態。統一規則，保留跨頁起始索引／手動狀態；重新加入及 relink 同交易定位／推導，失敗回滾。
+- 舊 schema 升級／v1 備份使用相同規則；未全庫回填 v2 或變更路徑識別。
+- 本次 npm16／Rust37、build與diff-check通過，新增奇偶頁／封面／手動狀態、真實來源變化、metadata保存及注入SQL失敗測試。完整輸出 review-fix-n1-n2/。
+- 產品提交 `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`，後續僅文件提交。未操作實際使用者庫；Windows cfg／native未執行，待複審。交辦 next-phase-review-fix-handoff.md。

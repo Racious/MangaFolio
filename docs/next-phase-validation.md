@@ -48,3 +48,7 @@ Windows native／WebView2、cfg(windows) 測試、磁碟／verbatim／UNC 上下
 未打包、簽章、發布或合併 main。schema v2 無降級遷移，回退需使用升級前備份；備份不含漫畫及外觀偏好。詳細驗收步驟見 [審查交辦](next-phase-review-assignment.md)。
 
 完整原始 .log 保留測試工具輸出的尾端空行；本結果目錄 .gitattributes 僅允許 .log 尾端空行，不調整程式碼 whitespace 檢查。固定開發基準到最終文件提交的 diff --check 另行核對。
+
+## 審查後 N1／N2 修正（2026-10-03，Asia/Tokyo）
+
+產品提交 `10af40e99c703c31332e00f5ab5bcd3c7ebe2ccc`，基準 `1394670f3b4ac63ab69fcedcabb650a2b0e97879`。本次 npm16／Rust37、build、diff-check 全部exit0。完整輸出與退出碼獨立保存於 `next-phase-results/review-fix-n1-n2/`，不以首輪結果代替。雙頁末組、自動／手動、來源擴縮頁／頁名定位與 SQL 回滾已補測。Windows cfg／native 本輪未執行。詳見 [修正複審交辦](next-phase-review-fix-handoff.md)。
