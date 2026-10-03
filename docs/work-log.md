@@ -89,3 +89,7 @@
 整合期間修正書籤 dialog 受隱藏工具列影響（Teleport）及關閉 dialog 阻擋 Esc／方向鍵；新增回歸。保存完整嘗試輸出與最終 npm21／Rust44、build、三組 browser 測試。大型書庫 10,000 本聚合／初始 60 個系列封面量測；另補切集 in-flight 關閉視窗保護與成功備份後清理失敗的精確回報。修正共用封面在來源重新上線後的更新與過期非同步結果保護，並以保留的詳情元件測試。有限 Linux Tauri 實際滿高閱讀、詳情、書籤寫入與下一集證據。
 
 第三階段未合併 main／未發版，Windows 等未驗項與原 PNG 歸檔外部限制明列於第三階段驗證／交辦；產品 ad0e366cb0d7c4b583968243f8d864d58fce0d3e，後續文件提交固定對應。
+
+## 2026-10-04 第三階段 T1／T2／T3 修正
+
+接手基準 421d2acea22fccb7f2822848c80ac5a2a265270e，工作區乾淨，保留兩份原報告。修正 Windows 快照 sync handle、DDL 假通過防護、自動 JSON 登記／成功時間／重啟重試、已刪檔 manifest 清理，以及 >60 本／系列與窄視窗返回位置。產品 PRODUCT_SHA_PENDING；無 schema 遷移、無用戶資料操作、無主線合併或發布。Linux npm21／Rust46、build、diff check、四支 browser script 通過，完整輸出与待 Windows 複驗見 third-phase-review-fix-validation.md／handoff.md。

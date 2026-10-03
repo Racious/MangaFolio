@@ -3,7 +3,7 @@ from pathlib import Path
 import os,json,time
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
-out=root/'docs/third-phase-results/browser';images=root/'docs/images/third-phase/implemented'
+out=Path(os.environ.get('MANGAFOLIO_THIRD_RESULT_DIR',root/'docs/third-phase-results/browser'));images=Path(os.environ.get('MANGAFOLIO_THIRD_IMAGE_DIR',root/'docs/images/third-phase/implemented'))
 out.mkdir(parents=True,exist_ok=True);images.mkdir(parents=True,exist_ok=True)
 fixture={'__file__':str(root/'scripts/validate-next-phase.py')}
 source=(root/'scripts/validate-next-phase.py').read_text().split('checks=[];errors=[];contrast=[]')[0]

@@ -4,6 +4,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
+| [T1／T2／T3 修正交辦](third-phase-review-fix-handoff.md) | 最新修正產品與獨立複審／Windows 清單 |
+| [T1／T2／T3 本次驗證](third-phase-review-fix-validation.md) | Linux 21／46、四支 browser、原始輸出與未執行項目 |
 | [第三階段計畫](third-phase-plan.md) | 固定基準、S1–S6、schema／JSON v3 契約與進度 |
 | [第三階段驗證](third-phase-validation.md) | 本次完整測試輸出與原生／mock 界線 |
 | [第三階段完整實際畫面](third-phase-visual-validation.md) | 正確三張參考與成品對照、配套畫面及素材替代 |

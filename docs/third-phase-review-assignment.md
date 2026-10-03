@@ -6,11 +6,15 @@
 最終產品提交：`ad0e366cb0d7c4b583968243f8d864d58fce0d3e`。本文件的後續提交只固定 SHA／驗證對應，不另更改產品；以 Git 記錄辨識文件提交。
 基準已含 A／R1／R2、N1／N2、UI 精修 e2a87d6 與主線 merge；舊審查不能涵蓋本次程式。
 
+## 最新 T1／T2／T3 修正（待獨立複審）
+
+原產品 ad0e366 與下方 npm21／Rust44 為首輪歷史資料。兩份独立報告已確認 T1–T3；本次修正產品 `PRODUCT_SHA_PENDING`，Linux npm21／Rust46、build、diff check 與四支 browser 回歸通過，最新 Windows 尚未執行。請優先依 [修正複審交辦](third-phase-review-fix-handoff.md) 審查聚焦與完整範圍；新結果寫入 `docs/third-phase-review-fix-report.md`，既有兩份報告保留不改。
+
 ## 審查要求
 
 閱讀本文件、`third-phase-plan.md`、`third-phase-validation.md`、`third-phase-visual-validation.md`、`library-guide.md`、`handoff.md`、原始 `review-report.md`、`review-fix-handoff.md`、`next-phase-review-fix-handoff.md` 與 `next-phase-review-fix-report.md`。審查固定基準至最終產品的實際 diff、測試及產品流程，不只依交辦文字判定。
 
-先判定 S1–S6，再檢查 A／R1／R2、N1／N2 與既有 F1–F6 是否退化。新結果寫入 `docs/third-phase-review-report.md`；舊報告保留不改。每個問題提供檔案位置、觸發條件、影響、證據及建議修法。未另行授權，不自行修改、提交、推送、合併或發布。
+先判定 S1–S6，再檢查 A／R1／R2、N1／N2 與既有 F1–F6 是否退化。首輪結果已寫入 `docs/third-phase-review-report.md`，本次新結果依上方修正交辦另寫，舊報告保留不改。每個問題提供檔案位置、觸發條件、影響、證據及建議修法。未另行授權，不自行修改、提交、推送、合併或發布。
 
 ## 功能與主要檔案
 
@@ -33,7 +37,7 @@ JSON v3 含既有書籍資訊、標籤、收藏、進度、偏好、書籤／筆
 
 自動預設關閉、保留 1–20 份；啟動及每 15 分鐘檢查、24 小時成功間隔（手動 JSON 成功也計入最近備份），可立即備份。僅清理本程式登記、嚴格名稱、有效 JSON 的 regular file；未知／未登記／symlink／升級快照保留。JSON 匯出 create_new，不覆寫已有備份或來源。清理失敗另明確回報「備份已建立，但保留清理失敗」，不宣稱已清理的舊檔還在；新檔及剩餘檔保留。請特別審查 I/O 失敗、manifest 失敗、清理失敗與 last_success／last_error 語意。
 
-## 本次驗證
+## 首輪 Linux 歷史驗證
 
 npm 21／Rust 44、build、diff check，以及 browser 既有功能／第三階段／沉浸閱讀測試，結果与完整輸出見 [本次驗證](third-phase-validation.md)。歷史 npm16／Rust37 不作為本次證據。Linux 不執行 Windows cfg 測試，舊 Windows 通過不能涵蓋本次。
 

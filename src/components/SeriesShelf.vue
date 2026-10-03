@@ -9,6 +9,7 @@ defineEmits<{ open: [key: string] }>();
     <button
       v-for="group in groups"
       :key="group.key"
+      :data-series-key="group.key"
       class="series-card"
       :disabled="busy"
       :aria-label="`開啟系列：${group.name}`"

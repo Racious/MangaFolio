@@ -373,12 +373,119 @@ mod tests {
             .filter_map(Result::ok)
             .any(|e| e.file_name() != unknown.file_name().unwrap()
                 && e.path().extension().is_some_and(|s| s == "json")));
+        l.connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_cleanup;")
+            .unwrap();
+        l.automatic_backup(false).unwrap(); // Retry unfinished SQL cleanup before the daily gate.
+        assert!(l.backup_settings().unwrap().last_error.is_empty());
+        assert_eq!(
+            l.connection
+                .lock()
+                .unwrap()
+                .query_row("SELECT COUNT(*) FROM automatic_backups", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert!(unknown.exists() && snapshot.exists());
         let other = Fixture::new();
         let bad = other.library();
         std::fs::write(other.0.join("data/backups"), b"not a directory").unwrap();
         assert!(bad.automatic_backup(true).is_err());
         assert!(!bad.backup_settings().unwrap().last_error.is_empty());
         assert!(bad.backup_settings().unwrap().last_success.is_none());
+    }
+    #[test]
+    fn automatic_manifest_failure_never_leaves_complete_unregistered_json_or_success_time() {
+        let f = Fixture::new();
+        let l = f.library();
+        l.register(&f.book()).unwrap();
+        l.set_backup_settings(true, 1).unwrap();
+        l.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_register BEFORE INSERT ON automatic_backups BEGIN SELECT RAISE(ABORT,'manifest failed'); END;").unwrap();
+        for force in [true, false] {
+            let error = l.automatic_backup(force).unwrap_err();
+            assert!(error.contains("擁有權登記失敗") && error.contains("未建立完整新備份"));
+            assert!(l.backup_settings().unwrap().last_success.is_none());
+            assert_eq!(
+                std::fs::read_dir(f.0.join("data/backups")).unwrap().count(),
+                0
+            );
+        }
+        l.connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_register;")
+            .unwrap();
+        l.automatic_backup(false).unwrap();
+        assert!(l.backup_settings().unwrap().last_success.is_some());
+        let prior = l.backup_settings().unwrap().last_success;
+        let path = std::fs::read_dir(f.0.join("data/backups"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let bytes = std::fs::read(&path).unwrap();
+        l.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_register BEFORE INSERT ON automatic_backups BEGIN SELECT RAISE(ABORT,'manifest failed'); END;").unwrap();
+        assert!(l.automatic_backup(true).is_err());
+        assert_eq!(l.backup_settings().unwrap().last_success, prior);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            std::fs::read_dir(f.0.join("data/backups")).unwrap().count(),
+            1
+        );
+    }
+    #[test]
+    fn automatic_success_timestamp_retry_survives_restart_before_daily_gate() {
+        let f = Fixture::new();
+        let l = f.library();
+        l.register(&f.book()).unwrap();
+        l.set_backup_settings(true, 1).unwrap();
+        l.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_stamp BEFORE UPDATE ON backup_settings WHEN NEW.last_success IS NOT NULL BEGIN SELECT RAISE(ABORT,'stamp failed'); END;").unwrap();
+        let error = l.automatic_backup(true).unwrap_err();
+        assert!(error.contains("備份已建立，但成功狀態更新失敗"));
+        assert!(l.backup_settings().unwrap().last_success.is_none());
+        let path = std::fs::read_dir(f.0.join("data/backups"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(Library::parse_backup(&bytes).is_ok());
+        assert_eq!(
+            l.connection
+                .lock()
+                .unwrap()
+                .query_row("SELECT COUNT(*) FROM automatic_backups", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        l.connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_stamp;")
+            .unwrap();
+        l.set_backup_settings(false, 1).unwrap(); // Disabled scheduling must still repair bookkeeping.
+        drop(l);
+        let restarted = f.library();
+        restarted.automatic_backup(false).unwrap();
+        assert!(restarted.backup_settings().unwrap().last_success.is_some());
+        assert!(restarted.backup_settings().unwrap().last_error.is_empty());
+        assert!(!restarted.backup_settings().unwrap().enabled);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            std::fs::read_dir(f.0.join("data/backups")).unwrap().count(),
+            1
+        );
+        restarted.automatic_backup(false).unwrap();
+        assert_eq!(
+            std::fs::read_dir(f.0.join("data/backups")).unwrap().count(),
+            1
+        );
     }
     #[test]
     fn migration_sql_failure_rolls_back_new_tables_and_keeps_safe_snapshot() {
@@ -388,7 +495,11 @@ mod tests {
         let db = Connection::open(dir.join("library.sqlite3")).unwrap();
         // Force failure after bookmarks creation, to verify DDL is in one transaction.
         db.execute_batch("CREATE TABLE backup_settings(original TEXT); INSERT INTO backup_settings VALUES('keep'); PRAGMA user_version=2;").unwrap();
-        assert!(Library::open(&dir).is_err());
+        let failure = Library::open(&dir).err().unwrap();
+        assert!(
+            failure.contains("backup_settings") && failure.contains("already exists"),
+            "must reach the injected DDL failure: {failure}"
+        );
         assert_eq!(
             db.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),

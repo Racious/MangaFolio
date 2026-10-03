@@ -25,7 +25,10 @@ pub(super) fn upgrade_snapshot(conn: &Connection, directory: &Path) -> Result<()
         let _ = std::fs::remove_file(&path);
         return Err(format!("升級前安全備份失敗，未升級資料庫：{e}"));
     }
-    std::fs::File::open(path)
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
         .and_then(|f| f.sync_all())
         .map_err(db_error)
 }
@@ -139,92 +142,180 @@ impl Library {
             .map_err(db_error)?;
         self.backup_settings()
     }
-    pub fn automatic_backup(&self, force: bool) -> Result<BackupSettings, String> {
-        let _guard = self.backup_lock.lock().map_err(db_error)?;
-        let settings = self.backup_settings()?;
-        if !force
-            && (!settings.enabled
-                || settings
-                    .last_success
-                    .is_some_and(|t| now().saturating_sub(t) < 86_400_000))
-        {
-            return Ok(settings);
+    // Ownership is recorded before writing JSON. Only registered, complete regular files
+    // can repair a failed success timestamp or enter retention; unknown files stay untouched.
+    fn automatic_files(&self) -> Result<Vec<(PathBuf, i64)>, String> {
+        let names = {
+            let conn = self.connection.lock().map_err(db_error)?;
+            let mut q = conn
+                .prepare("SELECT name FROM automatic_backups")
+                .map_err(db_error)?;
+            let rows = q
+                .query_map([], |r| r.get::<_, String>(0))
+                .map_err(db_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(db_error)?
+        };
+        let mut files = Vec::new();
+        for name in names {
+            if !owned_name(&name) {
+                continue;
+            }
+            let path = self.directory.join("backups").join(&name);
+            let meta = match std::fs::symlink_metadata(&path) {
+                Ok(meta) => meta,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    // A previous retention delete may have removed the file before SQL failed.
+                    self.connection
+                        .lock()
+                        .map_err(db_error)?
+                        .execute("DELETE FROM automatic_backups WHERE name=?1", [&name])
+                        .map_err(db_error)?;
+                    continue;
+                }
+                Err(error) => return Err(db_error(error)),
+            };
+            if !meta.file_type().is_file() {
+                continue;
+            }
+            let Ok(bytes) = read_backup(&path) else {
+                continue;
+            };
+            if Self::parse_backup(&bytes).is_err() {
+                continue;
+            }
+            let stamp = meta
+                .modified()
+                .map_err(db_error)?
+                .duration_since(UNIX_EPOCH)
+                .map_err(db_error)?
+                .as_millis()
+                .min(i64::MAX as u128) as i64;
+            files.push((path, stamp));
         }
-        let mut backup_created = false;
-        let result = (|| -> Result<(), String> {
-            let dir = self.directory.join("backups");
-            std::fs::create_dir_all(&dir).map_err(db_error)?;
-            let path = dir.join(unique_name("auto", "json"));
-            self.export_to(&path)?;
-            {
-                let mut conn = self.connection.lock().map_err(db_error)?;
-                let tx = conn.transaction().map_err(db_error)?;
-                tx.execute(
-                    "INSERT INTO automatic_backups(name) VALUES(?1)",
+        files.sort_by_key(|(_, stamp)| *stamp);
+        Ok(files)
+    }
+    fn clean_automatic_files(
+        &self,
+        files: &[(PathBuf, i64)],
+        retention: usize,
+    ) -> Result<(), String> {
+        for (path, _) in files.iter().take(files.len().saturating_sub(retention)) {
+            std::fs::remove_file(path).map_err(db_error)?;
+            self.connection
+                .lock()
+                .map_err(db_error)?
+                .execute(
+                    "DELETE FROM automatic_backups WHERE name=?1",
                     [path.file_name().unwrap().to_string_lossy().as_ref()],
                 )
                 .map_err(db_error)?;
-                tx.execute(
-                    "UPDATE backup_settings SET last_success=?1,last_error='' WHERE id=1",
-                    [now()],
-                )
-                .map_err(db_error)?;
-                tx.commit().map_err(db_error)?;
-            }
-            backup_created = true;
-            let registered = {
-                let conn = self.connection.lock().map_err(db_error)?;
-                let mut q = conn
-                    .prepare("SELECT name FROM automatic_backups")
-                    .map_err(db_error)?;
-                let rows = q
-                    .query_map([], |r| r.get::<_, String>(0))
-                    .map_err(db_error)?;
-                rows.collect::<Result<std::collections::HashSet<_>, _>>()
-                    .map_err(db_error)?
-            };
-            // Only strict names with a valid MangaFolio payload are eligible. Symlinks are excluded.
-            let mut owned = Vec::new();
-            for entry in std::fs::read_dir(&dir).map_err(db_error)? {
-                let entry = entry.map_err(db_error)?;
-                let name = entry.file_name().to_string_lossy().to_string();
-                if !entry.file_type().map_err(db_error)?.is_file()
-                    || !owned_name(&name)
-                    || !registered.contains(&name)
-                {
-                    continue;
-                }
-                if let Ok(bytes) = read_backup(&entry.path()) {
-                    if Self::parse_backup(&bytes).is_ok() {
-                        owned.push(entry.path());
-                    }
-                }
-            }
-            owned.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
-            let delete = owned.len().saturating_sub(settings.retention);
-            for file in owned.into_iter().take(delete) {
-                std::fs::remove_file(&file).map_err(db_error)?;
+        }
+        Ok(())
+    }
+    pub fn automatic_backup(&self, force: bool) -> Result<BackupSettings, String> {
+        use std::io::Write;
+        let _guard = self.backup_lock.lock().map_err(db_error)?;
+        let mut phase = "狀態恢復";
+        let mut created = false;
+        let result = (|| -> Result<(), String> {
+            let files = self.automatic_files()?;
+            let mut settings = self.backup_settings()?;
+            let recovered = files
+                .last()
+                .is_some_and(|(_, t)| Some(*t) > settings.last_success);
+            if recovered {
+                // Retry before the daily gate, including after process restart or disabled scheduling.
+                let stamp = files.last().unwrap().1;
                 self.connection
                     .lock()
                     .map_err(db_error)?
                     .execute(
-                        "DELETE FROM automatic_backups WHERE name=?1",
-                        [file.file_name().unwrap().to_string_lossy().as_ref()],
+                        "UPDATE backup_settings SET last_success=?1 WHERE id=1",
+                        [stamp],
                     )
                     .map_err(db_error)?;
+                settings.last_success = Some(stamp);
             }
+            if !force
+                && (!settings.enabled
+                    || settings
+                        .last_success
+                        .is_some_and(|t| now().saturating_sub(t) < 86_400_000))
+            {
+                phase = "保留清理";
+                self.clean_automatic_files(&files, settings.retention)?;
+                if recovered || settings.last_error.starts_with("備份已建立") {
+                    self.connection
+                        .lock()
+                        .map_err(db_error)?
+                        .execute("UPDATE backup_settings SET last_error='' WHERE id=1", [])
+                        .map_err(db_error)?;
+                }
+                return Ok(());
+            }
+            phase = "建立";
+            let bytes = self.backup_json()?;
+            let dir = self.directory.join("backups");
+            std::fs::create_dir_all(&dir).map_err(db_error)?;
+            let path = dir.join(unique_name("auto", "json"));
+            // Reserve a new empty file, never adopt/overwrite a colliding user file.
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .map_err(db_error)?;
+            phase = "擁有權登記";
+            let registered = self.connection.lock().map_err(db_error)?.execute(
+                "INSERT INTO automatic_backups(name) VALUES(?1)",
+                [path.file_name().unwrap().to_string_lossy().as_ref()],
+            );
+            if let Err(error) = registered {
+                drop(file);
+                let _ = std::fs::remove_file(&path); // Only this newly reserved, empty file.
+                return Err(db_error(error));
+            }
+            phase = "寫入與同步";
+            if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+                drop(file);
+                let _ = std::fs::remove_file(&path);
+                let _ = self.connection.lock().map_err(db_error)?.execute(
+                    "DELETE FROM automatic_backups WHERE name=?1",
+                    [path.file_name().unwrap().to_string_lossy().as_ref()],
+                );
+                return Err(db_error(error));
+            }
+            drop(file);
+            created = true;
+            phase = "成功狀態更新";
+            self.connection
+                .lock()
+                .map_err(db_error)?
+                .execute(
+                    "UPDATE backup_settings SET last_success=?1,last_error='' WHERE id=1",
+                    [now()],
+                )
+                .map_err(db_error)?;
+            phase = "保留清理";
+            self.clean_automatic_files(&self.automatic_files()?, settings.retention)?;
             Ok(())
         })();
         if let Err(error) = result {
+            let message = if created {
+                format!(
+                    "備份已建立，但{phase}失敗；新備份與未清理檔案保留，下次檢查會重試：{error}"
+                )
+            } else if phase == "成功狀態更新" || phase == "狀態恢復" || phase == "保留清理"
+            {
+                format!("備份狀態恢復／清理失敗；未清理檔案保留，下次檢查會重試：{error}")
+            } else {
+                format!("備份{phase}失敗；未建立完整新備份，既有成功備份已保留：{error}")
+            };
             let _ = self.connection.lock().map_err(db_error)?.execute(
                 "UPDATE backup_settings SET last_error=?1 WHERE id=1",
-                [&error],
+                [&message],
             );
-            return Err(if backup_created {
-                format!("備份已建立，但保留清理失敗；新備份與未清理檔案保留：{error}")
-            } else {
-                format!("備份失敗；既有成功備份已保留：{error}")
-            });
+            return Err(message);
         }
         self.backup_settings()
     }

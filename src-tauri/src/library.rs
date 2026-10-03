@@ -624,7 +624,17 @@ impl Library {
     }
 
     pub fn export_to(&self, path: &Path) -> Result<(), String> {
-        let result = self.write_export(path);
+        let result = self.write_export(path).and_then(|()| {
+            self.connection
+                .lock()
+                .map_err(db_error)?
+                .execute(
+                    "UPDATE backup_settings SET last_success=?1,last_error='' WHERE id=1",
+                    [now()],
+                )
+                .map_err(|e| format!("備份已建立，但成功狀態更新失敗：{e}"))?;
+            Ok(())
+        });
         if let Err(error) = &result {
             if let Ok(conn) = self.connection.lock() {
                 let _ = conn.execute(
@@ -649,14 +659,6 @@ impl Library {
             let _ = std::fs::remove_file(path);
             return Err(db_error(error));
         }
-        self.connection
-            .lock()
-            .map_err(db_error)?
-            .execute(
-                "UPDATE backup_settings SET last_success=?1,last_error='' WHERE id=1",
-                [now()],
-            )
-            .map_err(db_error)?;
         Ok(())
     }
 
