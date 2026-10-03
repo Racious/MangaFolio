@@ -3,7 +3,7 @@
 日期：2026-10-04（Asia/Tokyo）。分支：`feature/series-library-reading`。
 
 固定接手基準：`421d2acea22fccb7f2822848c80ac5a2a265270e`（已含兩份獨立審查報告）。
-修正後產品提交：`PRODUCT_SHA_PENDING`。後續固定 SHA 的文件提交不另修改產品；文件提交以 Git 記錄辨識。
+修正後產品提交：`45568a804b1228c9016f9a7fd2bd876218673b2e`。後續固定 SHA 的文件提交不另修改產品；文件提交以 Git 記錄辨識。
 原第三階段產品：`ad0e366cb0d7c4b583968243f8d864d58fce0d3e`；完整開發基準：`e38f7a84c33126e11a141d10c0f38f4defb8985f`。
 
 ## 範圍與行為
@@ -27,8 +27,8 @@
 
 ## 複審範圍與結果
 
-1. 聚焦修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `PRODUCT_SHA_PENDING`。
-2. 完整第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `PRODUCT_SHA_PENDING`。
+1. 聚焦修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `45568a804b1228c9016f9a7fd2bd876218673b2e`。
+2. 完整第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `45568a804b1228c9016f9a7fd2bd876218673b2e`。
 
 同時閱讀兩份原第三階段報告、原 review-report、A／R1／R2 及 N1／N2 交辦。檢查實際差異、測試與流程，先判 T1／T2／T3 是否修復，再確認 S1–S6、既有 F1–F6、A／R1／R2、N1／N2 沒有退化。特別審查同步 handle、DDL 失敗入口、備份建立／登記順序、成功时间與 retry gate、未知檔保護及 scroll owner／refresh 時序。新結果寫入 `docs/third-phase-review-fix-report.md`，不覆寫原報告。問題需附位置、條件、影響、證據與建議；未另授權，不自行修改、提交、推送或合併。
 

@@ -8,7 +8,7 @@
 
 ## 最新 T1／T2／T3 修正（待獨立複審）
 
-原產品 ad0e366 與下方 npm21／Rust44 為首輪歷史資料。兩份独立報告已確認 T1–T3；本次修正產品 `PRODUCT_SHA_PENDING`，Linux npm21／Rust46、build、diff check 與四支 browser 回歸通過，最新 Windows 尚未執行。請優先依 [修正複審交辦](third-phase-review-fix-handoff.md) 審查聚焦與完整範圍；新結果寫入 `docs/third-phase-review-fix-report.md`，既有兩份報告保留不改。
+原產品 ad0e366 與下方 npm21／Rust44 為首輪歷史資料。兩份独立報告已確認 T1–T3；本次修正產品 `45568a804b1228c9016f9a7fd2bd876218673b2e`，Linux npm21／Rust46、build、diff check 與四支 browser 回歸通過，最新 Windows 尚未執行。請優先依 [修正複審交辦](third-phase-review-fix-handoff.md) 審查聚焦與完整範圍；新結果寫入 `docs/third-phase-review-fix-report.md`，既有兩份報告保留不改。
 
 ## 審查要求
 

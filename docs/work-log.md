@@ -92,4 +92,4 @@
 
 ## 2026-10-04 第三階段 T1／T2／T3 修正
 
-接手基準 421d2acea22fccb7f2822848c80ac5a2a265270e，工作區乾淨，保留兩份原報告。修正 Windows 快照 sync handle、DDL 假通過防護、自動 JSON 登記／成功時間／重啟重試、已刪檔 manifest 清理，以及 >60 本／系列與窄視窗返回位置。產品 PRODUCT_SHA_PENDING；無 schema 遷移、無用戶資料操作、無主線合併或發布。Linux npm21／Rust46、build、diff check、四支 browser script 通過，完整輸出与待 Windows 複驗見 third-phase-review-fix-validation.md／handoff.md。
+接手基準 421d2acea22fccb7f2822848c80ac5a2a265270e，工作區乾淨，保留兩份原報告。修正 Windows 快照 sync handle、DDL 假通過防護、自動 JSON 登記／成功時間／重啟重試、已刪檔 manifest 清理，以及 >60 本／系列與窄視窗返回位置。產品 45568a804b1228c9016f9a7fd2bd876218673b2e；無 schema 遷移、無用戶資料操作、無主線合併或發布。Linux npm21／Rust46、build、diff check、四支 browser script 通過，完整輸出与待 Windows 複驗見 third-phase-review-fix-validation.md／handoff.md。

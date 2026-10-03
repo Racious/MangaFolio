@@ -2,7 +2,7 @@
 
 更新日期：2026-10-04（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、閱讀狀態、標籤、自訂資訊、匯入管理、三種可切換介面與備份還原、系列書架、下一集、書籤／筆記與安全備份。
 
-最新進度：已按第三階段兩份審查報告修正 T1／T2／T3，產品 `PRODUCT_SHA_PENDING`。本次 Linux 21／46 與 browser 回歸通過；最新 Windows／獨立複審未執行。接手先看 [修正交辦](third-phase-review-fix-handoff.md) 與 [驗證](third-phase-review-fix-validation.md)，原報告保留。
+最新進度：已按第三階段兩份審查報告修正 T1／T2／T3，產品 `45568a804b1228c9016f9a7fd2bd876218673b2e`。本次 Linux 21／46 與 browser 回歸通過；最新 Windows／獨立複審未執行。接手先看 [修正交辦](third-phase-review-fix-handoff.md) 與 [驗證](third-phase-review-fix-validation.md)，原報告保留。
 
 ## 目前狀態
 

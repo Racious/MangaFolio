@@ -30,5 +30,7 @@
   "diff-check": {
     "command": "git diff --check; git diff --cached --check",
     "exitCode": 0
-  }
+  },
+  "productSha": "45568a804b1228c9016f9a7fd2bd876218673b2e",
+  "environment": "Linux; Node 22 / Rust 1.95; isolated test DB; browser mock IPC, not Windows native"
 }

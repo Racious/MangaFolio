@@ -1,0 +1,22 @@
+   Compiling manga-reader v0.1.4 (/workspace/MangaFolio-management-ui/src-tauri)
+error[E0382]: borrow of moved value: `name`
+   --> src/library_safety.rs:171:82
+    |
+159 |         for name in names {
+    |             ---- move occurs because `name` has type `std::string::String`, which does not implement the `Copy` trait
+...
+163 |             let path = self.directory.join("backups").join(name);
+    |                                                            ---- value moved here
+...
+171 |                         .execute("DELETE FROM automatic_backups WHERE name=?1", [&name])
+    |                                                                                  ^^^^^ value borrowed here after move
+    |
+help: consider borrowing `name`
+    |
+163 |             let path = self.directory.join("backups").join(&name);
+    |                                                            +
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `manga-reader` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `manga-reader` (lib test) due to 1 previous error
