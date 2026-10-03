@@ -1,0 +1,110 @@
+
+> manga-reader@0.1.4 test
+> node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs
+
+TAP version 13
+# Subtest: appearance restores known settings and tolerates missing or corrupt storage
+ok 1 - appearance restores known settings and tolerates missing or corrupt storage
+  ---
+  duration_ms: 2.316474
+  type: 'test'
+  ...
+# Subtest: styles are independent from view and theme and old preferences gain default style
+ok 2 - styles are independent from view and theme and old preferences gain default style
+  ---
+  duration_ms: 0.19628
+  type: 'test'
+  ...
+# Subtest: cover queue bounds concurrent decoding and skips canceled offscreen jobs
+ok 3 - cover queue bounds concurrent decoding and skips canceled offscreen jobs
+  ---
+  duration_ms: 58.958839
+  type: 'test'
+  ...
+# Subtest: card favorite and unfavorite synchronize retained reader and its next toggle
+ok 4 - card favorite and unfavorite synchronize retained reader and its next toggle
+  ---
+  duration_ms: 4.571627
+  type: 'test'
+  ...
+# Subtest: failed favorite leaves both states unchanged
+ok 5 - failed favorite leaves both states unchanged
+  ---
+  duration_ms: 0.819318
+  type: 'test'
+  ...
+# Subtest: switching books while favorite is pending never updates the new reader
+ok 6 - switching books while favorite is pending never updates the new reader
+  ---
+  duration_ms: 0.809653
+  type: 'test'
+  ...
+# Subtest: store import prevents duplicate starts and honors cancellation and management lock
+ok 7 - store import prevents duplicate starts and honors cancellation and management lock
+  ---
+  duration_ms: 5.100987
+  type: 'test'
+  ...
+# Subtest: reader final spreads retain the start index in progress snapshots
+ok 8 - reader final spreads retain the start index in progress snapshots
+  ---
+  duration_ms: 9.65013
+  type: 'test'
+  ...
+# Subtest: batch import records added, updated, failed and conflicts and continues
+ok 9 - batch import records added, updated, failed and conflicts and continues
+  ---
+  duration_ms: 2.404113
+  type: 'test'
+  ...
+# Subtest: cancel preserves the in-flight successful item and never starts remaining sources
+ok 10 - cancel preserves the in-flight successful item and never starts remaining sources
+  ---
+  duration_ms: 0.321955
+  type: 'test'
+  ...
+# Subtest: search handles Chinese names, width normalization, case and surrounding spaces
+ok 11 - search handles Chinese names, width normalization, case and surrounding spaces
+  ---
+  duration_ms: 1.427293
+  type: 'test'
+  ...
+# Subtest: favorite and recent filters combine with search and distinguish unread from page one
+ok 12 - favorite and recent filters combine with search and distinguish unread from page one
+  ---
+  duration_ms: 0.236028
+  type: 'test'
+  ...
+# Subtest: natural title sorting and recent sorting do not mutate stored library order
+ok 13 - natural title sorting and recent sorting do not mutate stored library order
+  ---
+  duration_ms: 6.564773
+  type: 'test'
+  ...
+# Subtest: full-width b searches titles without matching archive path extensions
+ok 14 - full-width b searches titles without matching archive path extensions
+  ---
+  duration_ms: 0.326301
+  type: 'test'
+  ...
+# Subtest: status, missing-source, favorites, tags and metadata search compose without resetting
+ok 15 - status, missing-source, favorites, tags and metadata search compose without resetting
+  ---
+  duration_ms: 0.319772
+  type: 'test'
+  ...
+# Subtest: large library filtering and sorting keep a stable source array
+ok 16 - large library filtering and sorting keep a stable source array
+  ---
+  duration_ms: 77.097999
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 686.107716

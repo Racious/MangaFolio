@@ -3,6 +3,8 @@ import { useReaderStore, type Transition } from "../stores/reader";
 import { useUpdateStore } from "../stores/update";
 import { pickFolder, pickFile, type FitMode } from "../api/backend";
 
+defineEmits<{ library: [] }>();
+
 const reader = useReaderStore();
 const update = useUpdateStore();
 
@@ -45,26 +47,76 @@ function bumpScale(delta: number) {
 <template>
   <header class="toolbar">
     <div class="group">
-      <button class="btn" @click="openFolder">開啟資料夾</button>
-      <button class="btn" @click="openFile">開啟檔案</button>
+      <button class="btn" :disabled="reader.loading" @click="$emit('library')">
+        ← 書庫
+      </button>
+      <button class="btn" :disabled="reader.loading" @click="openFolder">
+        開啟資料夾
+      </button>
+      <button class="btn" :disabled="reader.loading" @click="openFile">
+        開啟檔案
+      </button>
     </div>
 
-    <div class="title" :title="reader.title">{{ reader.title || "MangaFolio" }}</div>
+    <button
+      v-if="reader.hasBook"
+      class="btn ghost"
+      :class="{ on: reader.favorite }"
+      :disabled="reader.favoritePending || reader.loading"
+      :aria-pressed="reader.favorite"
+      :aria-label="reader.favorite ? '取消收藏這本書' : '收藏這本書'"
+      @click="reader.toggleFavorite"
+    >
+      {{ reader.favorite ? "★ 已收藏" : "☆ 收藏" }}
+    </button>
+
+    <div class="title" :title="reader.title">
+      {{ reader.title || "MangaFolio" }}
+    </div>
 
     <div class="group right">
       <!-- 縮放模式 -->
-      <select class="select" :value="reader.zoom" :disabled="!reader.hasBook" @change="onZoom">
-        <option v-for="z in ZOOMS" :key="z.value" :value="z.value">{{ z.label }}</option>
+      <select
+        class="select"
+        aria-label="縮放模式"
+        :value="reader.zoom"
+        :disabled="!reader.hasBook"
+        @change="onZoom"
+      >
+        <option v-for="z in ZOOMS" :key="z.value" :value="z.value">
+          {{ z.label }}
+        </option>
       </select>
       <div v-if="reader.zoom === 'fixed'" class="scale">
-        <button class="btn ghost sq" :disabled="!reader.hasBook" @click="bumpScale(-0.1)">−</button>
-        <span class="counter sm">{{ Math.round(reader.fixedScale * 100) }}%</span>
-        <button class="btn ghost sq" :disabled="!reader.hasBook" @click="bumpScale(0.1)">＋</button>
+        <button
+          class="btn ghost sq"
+          :disabled="!reader.hasBook"
+          @click="bumpScale(-0.1)"
+        >
+          −
+        </button>
+        <span class="counter sm"
+          >{{ Math.round(reader.fixedScale * 100) }}%</span
+        >
+        <button
+          class="btn ghost sq"
+          :disabled="!reader.hasBook"
+          @click="bumpScale(0.1)"
+        >
+          ＋
+        </button>
       </div>
 
       <!-- 翻頁特效 -->
-      <select class="select" :value="reader.transition" @change="onTransition">
-        <option v-for="t in TRANSITIONS" :key="t.value" :value="t.value">{{ t.label }}</option>
+      <select
+        class="select"
+        aria-label="翻頁特效"
+        :value="reader.transition"
+        @change="onTransition"
+      >
+        <option v-for="t in TRANSITIONS" :key="t.value" :value="t.value">
+          {{ t.label }}
+        </option>
       </select>
 
       <span class="sep"></span>
@@ -96,7 +148,11 @@ function bumpScale(delta: number) {
         class="btn ghost"
         :disabled="!reader.hasBook"
         @click="reader.toggleDirection()"
-        :title="reader.direction === 'rtl' ? '右開（右到左，右頁數字小）' : '左開（左到右，左頁數字小）'"
+        :title="
+          reader.direction === 'rtl'
+            ? '右開（右到左，右頁數字小）'
+            : '左開（左到右，左頁數字小）'
+        "
       >
         {{ reader.direction === "rtl" ? "右開 →" : "← 左開" }}
       </button>
@@ -104,9 +160,15 @@ function bumpScale(delta: number) {
       <span class="sep"></span>
 
       <div class="pager" v-if="reader.hasBook">
-        <button class="btn ghost sq" @click="reader.prev()">‹</button>
-        <span class="counter">{{ reader.index + 1 }} / {{ reader.pageCount }}</span>
-        <button class="btn ghost sq" @click="reader.next()">›</button>
+        <button class="btn ghost sq" aria-label="上一頁" @click="reader.prev()">
+          ‹
+        </button>
+        <span class="counter"
+          >{{ reader.index + 1 }} / {{ reader.pageCount }}</span
+        >
+        <button class="btn ghost sq" aria-label="下一頁" @click="reader.next()">
+          ›
+        </button>
       </div>
 
       <span class="sep"></span>
@@ -121,7 +183,10 @@ function bumpScale(delta: number) {
       >
         {{ update.checking ? "檢查中…" : "檢查更新" }}
       </button>
-      <span v-if="update.statusMessage && !update.updateAvailable" class="update-hint">
+      <span
+        v-if="update.statusMessage && !update.updateAvailable"
+        class="update-hint"
+      >
         {{ update.statusMessage }}
       </span>
     </div>
@@ -137,6 +202,7 @@ function bumpScale(delta: number) {
   background: var(--bg-soft);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
+  flex-wrap: wrap;
 }
 .group {
   display: flex;
@@ -144,6 +210,7 @@ function bumpScale(delta: number) {
   gap: 8px;
 }
 .group.right {
+  flex-wrap: wrap;
   margin-left: auto;
 }
 .title {
@@ -166,6 +233,7 @@ function bumpScale(delta: number) {
   border-radius: 7px;
   font-size: 13px;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 .btn:hover:not(:disabled) {
@@ -228,5 +296,11 @@ function bumpScale(delta: number) {
 }
 .counter.sm {
   min-width: 48px;
+}
+@media (max-width: 1200px) {
+  .group.right {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
 }
 </style>

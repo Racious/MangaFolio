@@ -1,0 +1,22 @@
+[
+  {
+    "command": "npm test",
+    "exitCode": 0,
+    "log": "docs/next-phase-results/main-merge/npm-test.log"
+  },
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "log": "docs/next-phase-results/main-merge/npm-build.log"
+  },
+  {
+    "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "exitCode": 0,
+    "log": "docs/next-phase-results/main-merge/cargo-test.log"
+  },
+  {
+    "command": "git diff --cached --check",
+    "exitCode": 0,
+    "log": "docs/next-phase-results/main-merge/diff-check.log"
+  }
+]

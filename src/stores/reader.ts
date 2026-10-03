@@ -1,7 +1,22 @@
 // 閱讀器狀態：當前書、頁碼、閱讀方向、單／雙頁、縮放模式、翻頁特效、封面配對。
 
 import { defineStore } from "pinia";
-import { openPath, renderPageUrl, type FitMode } from "../api/backend";
+import {
+  openPath,
+  openLibraryBook,
+  renderPageUrl,
+  type BookInfo,
+  type FitMode,
+} from "../api/backend";
+
+import {
+  saveProgress,
+  setFavorite,
+  type ReadingProgress,
+} from "../api/library";
+
+let progressTimer: ReturnType<typeof setTimeout> | undefined;
+let saving: Promise<void> = Promise.resolve();
 
 /** 閱讀方向：rtl = 右開（日漫慣用），ltr = 左開。 */
 export type Direction = "rtl" | "ltr";
@@ -30,7 +45,12 @@ function pairStartOf(index: number, double: boolean, cover: boolean): number {
 }
 
 /** 求以 start 起始的跨頁包含的邏輯頁碼（邏輯順序，未套左右開）。 */
-function indicesOf(start: number, double: boolean, cover: boolean, count: number): number[] {
+function indicesOf(
+  start: number,
+  double: boolean,
+  cover: boolean,
+  count: number,
+): number[] {
   if (count === 0) return [];
   if (!double) return [start];
   if (cover && start === 0) return [0]; // 封面單獨
@@ -40,6 +60,12 @@ function indicesOf(start: number, double: boolean, cover: boolean, count: number
 export const useReaderStore = defineStore("reader", {
   state: () => ({
     title: "",
+    bookId: null as number | null,
+    sessionId: 0,
+    favorite: false,
+    favoritePending: false,
+    progressError: "",
+    savingProgress: false,
     pages: [] as string[],
     index: 0,
     direction: "rtl" as Direction,
@@ -79,6 +105,21 @@ export const useReaderStore = defineStore("reader", {
   },
 
   actions: {
+    /** Called after a successfully removed/relinked active entry; never resave its old source. */
+    discardBook() {
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      this.renderToken++;
+      this.clearSlots();
+      this.bookId = null;
+      this.sessionId = 0;
+      this.pages = [];
+      this.title = "";
+      this.index = 0;
+      this.favorite = false;
+      this.error = "";
+      this.progressError = "";
+    },
     /** 頁碼 → 所屬跨頁起始頁碼。 */
     pairStart(index: number): number {
       return pairStartOf(index, this.pageMode === "double", this.doubleCover);
@@ -86,7 +127,12 @@ export const useReaderStore = defineStore("reader", {
 
     /** 以 start 起始的跨頁邏輯頁碼。 */
     indicesForStart(start: number): number[] {
-      return indicesOf(start, this.pageMode === "double", this.doubleCover, this.pages.length);
+      return indicesOf(
+        start,
+        this.pageMode === "double",
+        this.doubleCover,
+        this.pages.length,
+      );
     },
 
     /** 下一個／上一個跨頁的起始頁碼；無則回傳 -1。 */
@@ -106,21 +152,95 @@ export const useReaderStore = defineStore("reader", {
     },
 
     async open(path: string) {
+      return this.loadBook(() => openPath(path));
+    },
+
+    async openBook(id: number) {
+      return this.loadBook(() => openLibraryBook(id));
+    },
+
+    async loadBook(load: () => Promise<BookInfo>) {
+      if (this.loading) return false;
       this.loading = true;
       this.error = "";
       try {
-        const info = await openPath(path);
+        await this.flushProgress();
+        const info = await load();
+        this.renderToken++;
+        this.clearSlots();
+        this.bookId = info.bookId;
+        this.sessionId = info.sessionId;
+        this.favorite = info.favorite;
         this.title = info.title;
         this.pages = info.pages;
+        Object.assign(this, info.preferences);
         this.index = this.pairStart(info.startIndex);
         await this.render();
+        this.scheduleProgress();
+        return true;
       } catch (e) {
         this.error = String(e);
-        this.pages = [];
-        this.title = "";
-        this.clearSlots();
+        return false;
       } finally {
         this.loading = false;
+      }
+    },
+
+    progressSnapshot(): ReadingProgress | null {
+      if (this.bookId === null || !this.hasBook) return null;
+      return {
+        id: this.bookId,
+        index: this.index,
+        pageName: this.pages[this.index],
+        preferences: {
+          direction: this.direction,
+          pageMode: this.pageMode,
+          zoom: this.zoom,
+          fixedScale: this.fixedScale,
+          doubleCover: this.doubleCover,
+          transition: this.transition,
+        },
+      };
+    },
+
+    scheduleProgress() {
+      clearTimeout(progressTimer);
+      progressTimer = setTimeout(() => {
+        void this.flushProgress().catch(() => {});
+      }, 400);
+    },
+
+    async flushProgress() {
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      const snapshot = this.progressSnapshot();
+      if (!snapshot) return;
+      this.savingProgress = true;
+      const task = saving.catch(() => {}).then(() => saveProgress(snapshot));
+      saving = task;
+      try {
+        await task;
+        this.progressError = "";
+      } catch (e) {
+        this.progressError = `閱讀進度尚未儲存：${String(e)}`;
+        throw e;
+      } finally {
+        this.savingProgress = false;
+      }
+    },
+
+    async toggleFavorite() {
+      if (this.bookId === null || this.favoritePending) return;
+      this.favoritePending = true;
+      const id = this.bookId;
+      const favorite = !this.favorite;
+      try {
+        await setFavorite(id, favorite);
+        if (this.bookId === id) this.favorite = favorite;
+      } catch (e) {
+        this.error = String(e);
+      } finally {
+        this.favoritePending = false;
       }
     },
 
@@ -140,19 +260,23 @@ export const useReaderStore = defineStore("reader", {
         const urls = await Promise.all(
           indices.map((i) =>
             renderPageUrl({
+              sessionId: this.sessionId,
               index: i,
               mode: this.zoom,
               viewportW: slotW,
               viewportH: this.viewportH,
               fixedScale: this.fixedScale,
-            })
-          )
+            }),
+          ),
         );
         if (token !== this.renderToken) {
           urls.forEach((u) => URL.revokeObjectURL(u));
           return;
         }
-        const next: ViewSlot[] = indices.map((i, k) => ({ index: i, url: urls[k] }));
+        const next: ViewSlot[] = indices.map((i, k) => ({
+          index: i,
+          url: urls[k],
+        }));
         this.clearSlots();
         // rtl（右開）時，邏輯較前的頁面顯示於右側。
         this.slots = this.direction === "rtl" ? next.reverse() : next;
@@ -164,6 +288,7 @@ export const useReaderStore = defineStore("reader", {
 
     /** 跳至指定頁（自動對齊跨頁起點）。 */
     async goto(target: number) {
+      if (this.loading) return;
       const max = Math.max(0, this.pages.length - 1);
       const t = Math.max(0, Math.min(target, max));
       const newIndex = this.pairStart(t);
@@ -201,13 +326,14 @@ export const useReaderStore = defineStore("reader", {
       return Promise.all(
         indices.map((i) =>
           renderPageUrl({
+            sessionId: this.sessionId,
             index: i,
             mode: this.zoom,
             viewportW: slotW,
             viewportH: this.viewportH,
             fixedScale: this.fixedScale,
-          })
-        )
+          }),
+        ),
       );
     },
 
@@ -215,7 +341,10 @@ export const useReaderStore = defineStore("reader", {
     commitWith(target: number, indices: number[], urls: string[]) {
       this.flow = target >= this.index ? 1 : -1;
       this.index = this.pairStart(target);
-      const next: ViewSlot[] = indices.map((i, k) => ({ index: i, url: urls[k] }));
+      const next: ViewSlot[] = indices.map((i, k) => ({
+        index: i,
+        url: urls[k],
+      }));
       this.clearSlots();
       this.slots = this.direction === "rtl" ? next.reverse() : next;
       this.viewSeq++;

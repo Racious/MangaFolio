@@ -1,0 +1,50 @@
+
+> manga-reader@0.1.4 test
+> node --experimental-strip-types --test tests/library.test.ts tests/favorite-store.test.mjs
+
+TAP version 13
+# Subtest: card favorite and unfavorite synchronize retained reader and its next toggle
+ok 1 - card favorite and unfavorite synchronize retained reader and its next toggle
+  ---
+  duration_ms: 4.495926
+  type: 'test'
+  ...
+# Subtest: failed favorite leaves both states unchanged
+ok 2 - failed favorite leaves both states unchanged
+  ---
+  duration_ms: 0.804035
+  type: 'test'
+  ...
+# Subtest: switching books while favorite is pending never updates the new reader
+ok 3 - switching books while favorite is pending never updates the new reader
+  ---
+  duration_ms: 0.704358
+  type: 'test'
+  ...
+# Subtest: search handles Chinese names, width normalization, case and surrounding spaces
+ok 4 - search handles Chinese names, width normalization, case and surrounding spaces
+  ---
+  duration_ms: 3.735345
+  type: 'test'
+  ...
+# Subtest: favorite and recent filters combine with search and distinguish unread from page one
+ok 5 - favorite and recent filters combine with search and distinguish unread from page one
+  ---
+  duration_ms: 0.177912
+  type: 'test'
+  ...
+# Subtest: natural title sorting and recent sorting do not mutate stored library order
+ok 6 - natural title sorting and recent sorting do not mutate stored library order
+  ---
+  duration_ms: 6.808923
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 680.148842

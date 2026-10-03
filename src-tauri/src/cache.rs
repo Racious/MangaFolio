@@ -45,6 +45,7 @@ impl<K: Hash + Eq, V: Clone> Lru<K, V> {
 /// 算繪快取的鍵：唯一決定一張最終 PNG 的所有參數。
 #[derive(Hash, Eq, PartialEq, Clone, Copy)]
 pub struct RenderKey {
+    pub session_id: u64,
     pub index: usize,
     /// 縮放模式代碼（見 commands::mode_code）。
     pub mode: u8,

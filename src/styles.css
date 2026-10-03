@@ -1,16 +1,7 @@
 /* MangaFolio 全域樣式 —— 沉穩深色 × 金調，呼應開發文件風格。 */
 
+@import "./themes.css";
 :root {
-  --bg: #14171c;
-  --bg-soft: #1b1f26;
-  --panel: #20252e;
-  --border: #2c333d;
-  --text: #d6dae0;
-  --text-dim: #8b94a3;
-  --accent: #c8a96a;
-  --accent-soft: #e0c896;
-  --red: #d98a8a;
-
   font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -49,4 +40,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   /* 拖曳時轉金調，回饋當前操作 */
   background: var(--accent);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

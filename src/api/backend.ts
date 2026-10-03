@@ -1,9 +1,15 @@
 // 封裝所有 Tauri IPC 呼叫，讓前端其餘部分不直接接觸 invoke。
 
+import type { ReaderPreferences } from "./library";
+
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export interface BookInfo {
+  bookId: number;
+  sessionId: number;
+  favorite: boolean;
+  preferences: ReaderPreferences;
   title: string;
   pageCount: number;
   pages: string[];
@@ -14,6 +20,7 @@ export interface BookInfo {
 export type FitMode = "window" | "width" | "height" | "original" | "fixed";
 
 export interface RenderRequest {
+  sessionId: number;
   index: number;
   mode: FitMode;
   viewportW: number;
@@ -24,6 +31,10 @@ export interface RenderRequest {
 /** 開啟指定路徑（資料夾／壓縮檔／單張圖片）。 */
 export function openPath(path: string): Promise<BookInfo> {
   return invoke<BookInfo>("open_path", { path });
+}
+
+export function openLibraryBook(id: number): Promise<BookInfo> {
+  return invoke<BookInfo>("open_library_book", { id });
 }
 
 /**
@@ -47,7 +58,9 @@ export async function renderPageUrl(req: RenderRequest): Promise<string> {
 
 /** 彈出系統對話框選擇資料夾。 */
 export function pickFolder(): Promise<string | null> {
-  return openDialog({ directory: true, multiple: false }) as Promise<string | null>;
+  return openDialog({ directory: true, multiple: false }) as Promise<
+    string | null
+  >;
 }
 
 /** 彈出系統對話框選擇壓縮檔或圖片。 */
@@ -55,7 +68,20 @@ export function pickFile(): Promise<string | null> {
   return openDialog({
     multiple: false,
     filters: [
-      { name: "漫畫／圖集", extensions: ["zip", "cbz", "jpg", "jpeg", "jfif", "png", "gif", "webp", "bmp"] },
+      {
+        name: "漫畫／圖集",
+        extensions: [
+          "zip",
+          "cbz",
+          "jpg",
+          "jpeg",
+          "jfif",
+          "png",
+          "gif",
+          "webp",
+          "bmp",
+        ],
+      },
       { name: "所有檔案", extensions: ["*"] },
     ],
   }) as Promise<string | null>;

@@ -1,0 +1,73 @@
+{
+  "isolatedDatabase": "/tmp/mangafolio-next-phase-native/data/com.racious.mangafolio/library.sqlite3",
+  "schemaVersion": 2,
+  "rowsAfterNativeEdit": [
+    [
+      1,
+      "海邊故事",
+      "Native custom title",
+      "Native series",
+      "2",
+      "Isolated Linux native validation",
+      1,
+      42,
+      "reading"
+    ],
+    [
+      2,
+      "森林手帖",
+      "",
+      "",
+      "",
+      "",
+      0,
+      0,
+      "unread"
+    ],
+    [
+      3,
+      "夜行列車",
+      "",
+      "",
+      "",
+      "",
+      0,
+      119,
+      "read"
+    ],
+    [
+      4,
+      "星際日誌",
+      "",
+      "",
+      "",
+      "",
+      0,
+      0,
+      "unread"
+    ]
+  ],
+  "boundary": "Isolated Linux Tauri actual IPC / no Windows acceptance",
+  "afterReopenAndReturn": [
+    1,
+    "海邊故事",
+    "Native custom title",
+    "Native series",
+    "2",
+    "Isolated Linux native validation",
+    1,
+    43,
+    "reading"
+  ],
+  "checks": [
+    "schema v1 migration to v2",
+    "native metadata edit through real IPC",
+    "ID/source title/favorite preserved",
+    "reopen uses custom reader title and restores page 43",
+    "turn page and return saves page 44",
+    "calm grid/catalog detail/night compact switch",
+    "640x480 collapsible navigation",
+    "final rebuilt native executable restarts with night/dark/compact settings and saved page 44"
+  ],
+  "picker": "GTK opened and isolated path entered, listing/Open did not complete; not accepted as import success"
+}

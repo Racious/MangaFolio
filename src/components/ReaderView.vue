@@ -31,7 +31,10 @@ let pendingTarget = 0;
 
 // 僅「雙頁＋翻書」有翻頁動畫（3D 覆蓋層）；單頁與「無」皆即時換頁。
 const useBookFlip = computed(
-  () => reader.transition === "book" && reader.pageMode === "double" && reader.hasBook
+  () =>
+    reader.transition === "book" &&
+    reader.pageMode === "double" &&
+    reader.hasBook,
 );
 
 async function turn(forward: boolean) {
@@ -77,25 +80,47 @@ async function turn(forward: boolean) {
     return;
   }
   // 目標跨頁的顯示左／右頁（依閱讀方向，與 store 排版一致）。
-  const targetRight = rtl ? urls[0] : urls[1] ?? urls[0];
-  const targetLeft = rtl ? urls[1] ?? urls[0] : urls[0];
+  const targetRight = rtl ? urls[0] : (urls[1] ?? urls[0]);
+  const targetLeft = rtl ? (urls[1] ?? urls[0]) : urls[0];
 
   flip.value =
     side === "left"
       ? // 左頁往右翻：正面=當前左頁，背面=目標右頁，露出目標左頁，右側不動
-        { single: false, side: "left", front: curLeft, back: targetRight, reveal: targetLeft, staticUrl: curRight, urls }
+        {
+          single: false,
+          side: "left",
+          front: curLeft,
+          back: targetRight,
+          reveal: targetLeft,
+          staticUrl: curRight,
+          urls,
+        }
       : // 右頁往左翻：正面=當前右頁，背面=目標左頁，露出目標右頁，左側不動
-        { single: false, side: "right", front: curRight, back: targetLeft, reveal: targetRight, staticUrl: curLeft, urls };
+        {
+          single: false,
+          side: "right",
+          front: curRight,
+          back: targetLeft,
+          reveal: targetRight,
+          staticUrl: curLeft,
+          urls,
+        };
 
   flipTurned.value = false;
   pendingTarget = target;
   await nextTick();
-  requestAnimationFrame(() => requestAnimationFrame(() => (flipTurned.value = true)));
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => (flipTurned.value = true)),
+  );
 }
 
 function onFlipEnd(e: TransitionEvent) {
   if (e.propertyName !== "transform" || !flip.value) return;
-  reader.commitWith(pendingTarget, reader.indicesForStart(pendingTarget), flip.value.urls);
+  reader.commitWith(
+    pendingTarget,
+    reader.indicesForStart(pendingTarget),
+    flip.value.urls,
+  );
   flip.value = null;
   flipTurned.value = false;
 }
@@ -111,7 +136,20 @@ function onClick(e: MouseEvent) {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (!reader.hasBook) return;
+  const target = e.target instanceof Element ? e.target : null;
+  if (
+    !reader.hasBook ||
+    reader.loading ||
+    e.isComposing ||
+    e.ctrlKey ||
+    e.metaKey ||
+    e.altKey ||
+    target?.closest(
+      "input, textarea, select, button, [contenteditable], [role='dialog']",
+    ) ||
+    document.querySelector("[role='dialog']")
+  )
+    return;
   const el = scroller.value;
   // 單次捲動約視窗高 0.7（幅度大但靠 smooth 平滑滑行，非瞬間跳動）。
   const stepPx = el ? Math.max(160, el.clientHeight * 0.7) : 160;
@@ -162,7 +200,7 @@ watch(
     lastScrollIndex = reader.index;
     if (scroller.value) scroller.value.scrollTop = 0;
   },
-  { flush: "post" }
+  { flush: "post" },
 );
 
 onMounted(() => {
@@ -182,13 +220,27 @@ onUnmounted(() => {
     <div v-if="!reader.hasBook" class="placeholder">
       <div class="placeholder-art">漫</div>
       <p class="placeholder-title">尚未開啟書籍</p>
-      <p class="placeholder-hint">由上方工具列開啟資料夾或壓縮檔（ZIP / CBZ）</p>
+      <p class="placeholder-hint">
+        由上方工具列開啟資料夾或壓縮檔（ZIP / CBZ）
+      </p>
     </div>
 
-    <div v-else class="scroll" :class="{ fit: reader.zoom === 'window' }" ref="scroller" @click="onClick">
+    <div
+      v-else
+      class="scroll"
+      :class="{ fit: reader.zoom === 'window' }"
+      ref="scroller"
+      @click="onClick"
+    >
       <!-- 版面直接就位；翻書動畫由 3D 覆蓋層負責，其餘即時換頁 -->
       <div class="stage">
-        <img v-for="slot in reader.slots" :key="slot.index" :src="slot.url" class="page" draggable="false" />
+        <img
+          v-for="slot in reader.slots"
+          :key="slot.index"
+          :src="slot.url"
+          class="page"
+          draggable="false"
+        />
       </div>
     </div>
 
@@ -218,7 +270,12 @@ onUnmounted(() => {
                 <img class="face back" :src="flip.back" draggable="false" />
               </div>
             </template>
-            <img v-else class="static-page" :src="flip.staticUrl" draggable="false" />
+            <img
+              v-else
+              class="static-page"
+              :src="flip.staticUrl"
+              draggable="false"
+            />
           </div>
           <div class="half" :class="{ 'flip-half': flip.side === 'right' }">
             <template v-if="flip.side === 'right'">
@@ -229,7 +286,12 @@ onUnmounted(() => {
                 <img class="face back" :src="flip.back" draggable="false" />
               </div>
             </template>
-            <img v-else class="static-page" :src="flip.staticUrl" draggable="false" />
+            <img
+              v-else
+              class="static-page"
+              :src="flip.staticUrl"
+              draggable="false"
+            />
           </div>
         </template>
       </div>
@@ -322,7 +384,9 @@ onUnmounted(() => {
   inset: 0;
   z-index: 10;
   transform-style: preserve-3d;
-  transition: transform 0.5s ease-in-out, filter 0.5s ease-in-out;
+  transition:
+    transform 0.5s ease-in-out,
+    filter 0.5s ease-in-out;
 }
 .sheet-right {
   transform-origin: left center;

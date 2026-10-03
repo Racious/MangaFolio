@@ -1,0 +1,32 @@
+[
+  {
+    "command": "npm test",
+    "exitCode": 0,
+    "output": "docs/next-phase-results/visual-refinement/npm-test.log",
+    "completedUTC": "2026-10-03T16:11:44.779703+00:00"
+  },
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "output": "docs/next-phase-results/visual-refinement/npm-build.log",
+    "completedUTC": "2026-10-03T16:11:51.549864+00:00"
+  },
+  {
+    "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "exitCode": 0,
+    "output": "docs/next-phase-results/visual-refinement/cargo-test.log",
+    "completedUTC": "2026-10-03T16:11:52.553787+00:00"
+  },
+  {
+    "command": "git diff --check",
+    "exitCode": 0,
+    "output": "docs/next-phase-results/visual-refinement/diff-check.log",
+    "completedUTC": "2026-10-03T16:14:06.400512+00:00"
+  },
+  {
+    "command": "cargo build --locked --manifest-path src-tauri/Cargo.toml",
+    "exitCode": 0,
+    "output": "docs/next-phase-results/visual-refinement/native-build.log",
+    "completedUTC": "2026-10-03T16:11:52.906794+00:00"
+  }
+]

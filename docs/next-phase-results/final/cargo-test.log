@@ -1,0 +1,54 @@
+   Compiling manga-reader v0.1.4 (/workspace/MangaFolio-management-ui/src-tauri)
+    Finished `test` profile [optimized + debuginfo] target(s) in 22.03s
+     Running unittests src/lib.rs (/workspace/MangaFolio/src-tauri/target/debug/deps/manga_reader_lib-942614c1d941467f)
+
+running 34 tests
+test commands::tests::old_session_cannot_use_new_book_or_its_cached_pixels ... ok
+test library::tests::archive_titles_reimport_preserves_state_and_folder_dots ... ok
+test library::tests::backup_rejects_future_version_duplicates_and_invalid_paths ... ok
+test commands::tests::unique_alias_and_offline_restore_open_selected_id_with_reading_state ... ok
+test commands::tests::duplicate_sources_reject_both_selected_ids_and_import_without_switching_reader ... ok
+test library::tests::backup_roundtrip_merge_preserves_existing_and_restores_offline_metadata ... ok
+test library::tests::batch_mutations_are_atomic_and_never_delete_sources ... ok
+test library::tests::cover_is_a_real_cached_png_and_leaves_current_book_independent ... ok
+test library::tests::export_writes_valid_backup_and_refuses_to_overwrite_sources_or_backup ... ok
+test library::tests::failed_v1_migration_rolls_back_columns_and_version ... ok
+test library::tests::import_report_distinguishes_added_updated_and_preserves_info ... ok
+test library::tests::favorites_progress_and_preferences_survive_restart ... ok
+test library::tests::invalid_progress_cannot_overwrite_good_data ... ok
+test library::tests::missing_source_keeps_favorite_and_progress ... ok
+test library::tests::manual_status_is_independent_and_batch_failures_are_atomic ... ok
+test library::tests::newer_database_is_rejected_without_resetting_it ... ok
+test library::tests::reimport_keeps_id_and_favorite_without_marking_unread_book_recent ... ok
+test library::tests::offline_restore_reconnect_keeps_identity_and_settings ... ok
+test library::tests::invalid_backup_cannot_partially_restore_or_change_existing ... ok
+test library::tests::relink_conflict_keeps_both_entries_intact ... ok
+test library::tests::relink_preserves_identity_preferences_and_matches_page_name ... ok
+test library::tests::restore_alias_merge_duplicates_and_reopen_preserve_state ... ok
+test library::tests::resume_tracks_page_name_when_pages_are_inserted ... ok
+test library::tests::restore_v1_defaults_and_v2_failures_roll_back_catalog_and_books ... ok
+test library::tests::selected_source_mismatch_and_sql_failure_leave_data_unchanged ... ok
+test library::tests::tag_validation_batches_and_delete_never_delete_sources ... ok
+test library::tests::windows_keys_only_convert_absolute_disks_and_complete_unc ... ok
+test library::tests::tags_and_custom_info_survive_reimport_relink_and_backup ... ok
+test sorting::tests::leading_zeros ... ok
+test sorting::tests::mixed_text ... ok
+test sorting::tests::numeric_order ... ok
+test library::tests::windows_offline_spellings_merge_and_reject_duplicate_backup ... ok
+test library::tests::v1_database_migrates_without_losing_identity_or_progress ... ok
+test library::tests::large_offline_library_restores_checks_sources_and_exports ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running unittests src/main.rs (/workspace/MangaFolio/src-tauri/target/debug/deps/manga_reader-9ab2358490c042e2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests manga_reader_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

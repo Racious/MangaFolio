@@ -17,8 +17,8 @@ pub fn is_image(name: &str) -> bool {
 
 /// 書籍來源。
 pub enum Source {
-    /// 資料夾：`entries` 已存各頁的絕對路徑字串，無需另存資料夾路徑。
-    Folder,
+    /// 資料夾路徑供書庫識別使用；`entries` 存各頁的路徑字串。
+    Folder(PathBuf),
     /// 壓縮檔：`entries` 為壓縮檔內各頁的條目名稱，讀取時據此重新開檔。
     Zip(PathBuf),
 }
@@ -37,6 +37,19 @@ pub struct OpenResult {
 }
 
 impl Book {
+    pub fn source_path(&self) -> &Path {
+        match &self.source {
+            Source::Folder(path) | Source::Zip(path) => path,
+        }
+    }
+
+    pub fn format(&self) -> &'static str {
+        match &self.source {
+            Source::Folder(_) => "folder",
+            Source::Zip(_) => "cbz",
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -44,7 +57,7 @@ impl Book {
     /// 供前端顯示用的頁面名稱清單。
     pub fn page_names(&self) -> Vec<String> {
         match &self.source {
-            Source::Folder => self.entries.iter().map(|p| file_name_of(p)).collect(),
+            Source::Folder(_) => self.entries.iter().map(|p| file_name_of(p)).collect(),
             Source::Zip(_) => self.entries.clone(),
         }
     }
@@ -56,7 +69,7 @@ impl Book {
             .get(index)
             .ok_or_else(|| format!("頁碼超出範圍：{index}"))?;
         match &self.source {
-            Source::Folder => std::fs::read(entry).map_err(|e| format!("讀取頁面失敗：{e}")),
+            Source::Folder(_) => std::fs::read(entry).map_err(|e| format!("讀取頁面失敗：{e}")),
             Source::Zip(path) => crate::archive::zip::read_entry(path, entry),
         }
     }
@@ -74,7 +87,7 @@ pub fn open(path: &str) -> Result<OpenResult, String> {
         return Ok(OpenResult {
             book: Book {
                 title: dir_title(p, path),
-                source: Source::Folder,
+                source: Source::Folder(p.to_path_buf()),
                 entries,
             },
             start_index: 0,
@@ -96,7 +109,10 @@ pub fn open(path: &str) -> Result<OpenResult, String> {
                 entries.sort_by(|a, b| natural_cmp(a, b));
                 return Ok(OpenResult {
                     book: Book {
-                        title: dir_title(p, path),
+                        title: p
+                            .file_stem()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| path.to_string()),
                         source: Source::Zip(p.to_path_buf()),
                         entries,
                     },
@@ -111,7 +127,7 @@ pub fn open(path: &str) -> Result<OpenResult, String> {
                 return Ok(OpenResult {
                     book: Book {
                         title: dir_title(parent, path),
-                        source: Source::Folder,
+                        source: Source::Folder(parent.to_path_buf()),
                         entries,
                     },
                     start_index,

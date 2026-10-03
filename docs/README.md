@@ -1,0 +1,20 @@
+# 文件索引
+
+書庫開發分支：`feature/library-management-ui`。文件更新日期：2026-10-03（Asia/Tokyo）。
+
+| 文件 | 用途 |
+| --- | --- |
+| [介面精修實際預覽](ui-refinement-preview.md) | 三種風格、列表、沉浸閱讀與本次驗證界線 |
+| [新功能教學](library-guide.md) | 使用者操作、畫面對照、取得與啟動方式 |
+| [開發交接](handoff.md) | 開發者接手所需的狀態、架構、資料保存、待辦與發版注意事項 |
+| [驗證紀錄](validation.md) | 已執行的測試、實測證據、未驗證項目與重驗清單 |
+| [工作日誌](work-log.md) | 開發、環境問題、推送與文件整理的紀錄 |
+| [本地審查作業交辦單](review-assignment.md) | 可直接貼給 Claude／Codex 的任務、固定提交範圍、驗收與報告要求 |
+| [本輪開發計畫](next-phase-plan.md) | 固定基準、需求進度、schema／備份與外觀契約 |
+| [N1／N2 修正複審交辦](next-phase-review-fix-handoff.md) | 最新修正產品 SHA、16／37 項驗證及待實機複驗 |
+| [本輪驗證](next-phase-validation.md) | 實際測試輸出、畫面證據及未執行項目 |
+| [本輪審查交辦](next-phase-review-assignment.md) | 固定產品 SHA、獨立審查及 Windows 逐步驗收 |
+| [視覺自檢](../design-qa.md) | 實作與設計方向比較，非獨立審查 |
+| [版本變更紀錄](../CHANGELOG.md) | 使用者可見的版本更新；此分支內容列於 Unreleased |
+
+建議順序：使用者先讀教學；接手開發者先讀交接與驗證紀錄，再查看工作日誌。最新文件提交以 Git 紀錄為準；文件不自行引用其尚未產生的提交編號。

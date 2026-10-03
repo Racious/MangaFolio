@@ -1,0 +1,43 @@
+[
+  {
+    "command": [
+      "npm",
+      "test"
+    ],
+    "exitCode": 0,
+    "output": "npm-test.log",
+    "executedAtUTC": "2026-10-03T12:44:27.154465+00:00"
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "exitCode": 0,
+    "output": "npm-build.log",
+    "executedAtUTC": "2026-10-03T12:44:31.058312+00:00"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "src-tauri/Cargo.toml"
+    ],
+    "exitCode": 0,
+    "output": "cargo-test.log",
+    "executedAtUTC": "2026-10-03T12:44:53.695296+00:00"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0,
+    "output": "diff-check.log",
+    "executedAtUTC": "2026-10-03T12:44:53.700880+00:00"
+  }
+]

@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "version:set": "node scripts/set-version.mjs"
   },
   "dependencies": {
+    "@phosphor-icons/vue": "^2.2.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",

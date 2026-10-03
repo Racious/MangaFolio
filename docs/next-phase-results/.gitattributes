@@ -1,0 +1,3 @@
+# Preserve complete command transcripts, including the test runner's final blank line.
+# Only this generated-output directory allows a blank line at EOF; source checks stay unchanged.
+*.log whitespace=-blank-at-eof
