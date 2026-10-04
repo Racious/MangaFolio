@@ -1,0 +1,7 @@
+{
+  "src/components/BackupPanel.vue": "c56b043e53ef9f1517b04f770bc05402ad871a5fa5c0188e80b2251afa7f29fd",
+  "src/stores/backup.ts": "00288ee3835f9f71d5b629b654c9974ef3717e76ad31658797e2ecdc48004aa0",
+  "src/App.vue": "063af0b30c3ddc0a9a87cb04c09726b25ad3b6babc0ae611fc5222d021b53b71",
+  "scripts/validate-backup-panel-recovery.py": "f1cf982507d10c127e5f1daa0e7df4531d2865ceab368d1fa071fac544815994",
+  "scripts/validate-next-phase.py": "254748dc1b2a6cffa88e24a8b44607585b31693041cff66f29de76e4e821668f"
+}

@@ -81,8 +81,9 @@ async function restore() {
 async function automatic() {
   await run(async () => {
     await backup.maintain(true);
-    if (backup.error) throw new Error(backup.error);
-    library.importNotice = "本機安全備份已建立。";
+    // Automatic errors belong to the store so scheduled recovery updates this panel.
+    if (!backup.error && !backup.settings.lastError)
+      library.importNotice = "本機安全備份已建立。";
   });
 }
 </script>

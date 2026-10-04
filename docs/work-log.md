@@ -97,3 +97,7 @@
 ## 2026-10-04 T2-R1 連續恢復失敗補強
 
 接手 52e30f5865a0596514f5fa9e03187c3f1e28a3cf；工作區乾淨、保留三份原第三階段審查。先以新回歸在原產品重現過期錯誤（exit101），再補恢復／清理成功的錯誤清除條件，共用現有階段文案常數。新增停用與 24h gate 內連續失敗恢復，以及未恢復建立錯誤不得清除的兩項測試。產品 0b883c85e77ea8046fa851464c80a86fbbb7c513；Linux48／npm21、build／diff 通過，完整輸出與待 Windows 項目見 third-phase-t2-r1-handoff.md。未碰使用者 DB，無 schema／新功能、無主線合併或發布。
+
+## 2026-10-04 T2-UI1 面板錯誤單一來源
+
+接手 1d62ec7f5203e32a533ff926d89c1cf3fb16820b，工作區乾淨。原四份報告保留；新報告確認 T2-R1 後端結案，面板錯誤另留副本。真實 Vue／Pinia／App 排程重現成功恢復仍 alert（預期 exit1）；僅修 BackupPanel automatic() 不重複 throw store 的錯誤，成功通知加空錯誤條件。八項新元件回歸、既有書庫／第三階段整合、Linux48／npm21／build／diff 通過。產品 T2_UI1_PRODUCT_SHA_PENDING；完整輸出與未執行項目見 third-phase-t2-ui1-handoff.md。無用戶 DB、schema、主線合併或發布。

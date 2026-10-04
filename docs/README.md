@@ -4,7 +4,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| [T2-R1 最新修正交辦](third-phase-t2-r1-handoff.md) | 連續清理失敗後恢復、Linux48／21、本次完整輸出及待 Windows 複驗 |
+| [T2-UI1 最新面板修正](third-phase-t2-ui1-handoff.md) | 單一備份錯誤來源、八項元件回歸、本次輸出與待 Windows 複審 |
+| [T2-R1 修正交辦](third-phase-t2-r1-handoff.md) | 連續清理失敗後恢復、Linux48／21、本次完整輸出及待 Windows 複驗 |
 | [T1／T2／T3 修正交辦](third-phase-review-fix-handoff.md) | 最新修正產品與獨立複審／Windows 清單 |
 | [T1／T2／T3 本次驗證](third-phase-review-fix-validation.md) | Linux 21／46、四支 browser、原始輸出與未執行項目 |
 | [第三階段計畫](third-phase-plan.md) | 固定基準、S1–S6、schema／JSON v3 契約與進度 |

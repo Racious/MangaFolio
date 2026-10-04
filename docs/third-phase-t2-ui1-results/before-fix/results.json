@@ -1,0 +1,36 @@
+{
+  "mode": "actual Vue/Pinia/App 900000ms callback; mock IPC, not native acceptance",
+  "checks": [
+    {
+      "case": "immediate-failure-visible",
+      "state": {
+        "pending": false,
+        "error": "備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed",
+        "lastError": "備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed",
+        "lastSuccess": 1700000000000,
+        "panelAlert": "Error: 備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed",
+        "notice": ""
+      }
+    },
+    {
+      "case": "scheduled-retry-failure-replaces-current-error",
+      "state": {
+        "pending": false,
+        "error": "備份狀態恢復／清理失敗；下次檢查會重試：cleanup failed",
+        "lastError": "備份狀態恢復／清理失敗；下次檢查會重試：cleanup failed",
+        "lastSuccess": 1700000000000,
+        "panelAlert": "Error: 備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed",
+        "notice": ""
+      }
+    }
+  ],
+  "lastState": {
+    "pending": false,
+    "error": "",
+    "lastError": "",
+    "lastSuccess": 1700000000000,
+    "panelAlert": "Error: 備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed",
+    "notice": ""
+  },
+  "pageErrors": []
+}
