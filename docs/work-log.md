@@ -100,4 +100,4 @@
 
 ## 2026-10-04 T2-UI1 面板錯誤單一來源
 
-接手 1d62ec7f5203e32a533ff926d89c1cf3fb16820b，工作區乾淨。原四份報告保留；新報告確認 T2-R1 後端結案，面板錯誤另留副本。真實 Vue／Pinia／App 排程重現成功恢復仍 alert（預期 exit1）；僅修 BackupPanel automatic() 不重複 throw store 的錯誤，成功通知加空錯誤條件。八項新元件回歸、既有書庫／第三階段整合、Linux48／npm21／build／diff 通過。產品 T2_UI1_PRODUCT_SHA_PENDING；完整輸出與未執行項目見 third-phase-t2-ui1-handoff.md。無用戶 DB、schema、主線合併或發布。
+接手 1d62ec7f5203e32a533ff926d89c1cf3fb16820b，工作區乾淨。原四份報告保留；新報告確認 T2-R1 後端結案，面板錯誤另留副本。真實 Vue／Pinia／App 排程重現成功恢復仍 alert（預期 exit1）；僅修 BackupPanel automatic() 不重複 throw store 的錯誤，成功通知加空錯誤條件。八項新元件回歸、既有書庫／第三階段整合、Linux48／npm21／build／diff 通過。產品 b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f；完整輸出與未執行項目見 third-phase-t2-ui1-handoff.md。無用戶 DB、schema、主線合併或發布。

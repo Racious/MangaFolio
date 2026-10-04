@@ -2,7 +2,7 @@
 
 日期：2026-10-04（Asia/Tokyo）。分支：`feature/series-library-reading`。
 固定接手基準：`1d62ec7f5203e32a533ff926d89c1cf3fb16820b`（已含最新獨立報告）。
-本次產品提交：`T2_UI1_PRODUCT_SHA_PENDING`；後續固定 SHA 的文件提交不另修改產品，以 Git 記錄區分。
+本次產品提交：`b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`；後續固定 SHA 的文件提交不另修改產品，以 Git 記錄區分。
 前輪產品：`0b883c85e77ea8046fa851464c80a86fbbb7c513`。原報告 `third-phase-t2-r1-review-report.md` 及另外三份第三階段報告完整保留。
 
 ## 本次問題与修正
@@ -51,9 +51,9 @@
 
 ## 獨立複審與 Windows 待驗
 
-- 聚焦 UI1：`1d62ec7f5203e32a533ff926d89c1cf3fb16820b` → `T2_UI1_PRODUCT_SHA_PENDING`。
-- 累積修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `T2_UI1_PRODUCT_SHA_PENDING`。
-- 整體第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `T2_UI1_PRODUCT_SHA_PENDING`。
+- 聚焦 UI1：`1d62ec7f5203e32a533ff926d89c1cf3fb16820b` → `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`。
+- 累積修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`。
+- 整體第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`。
 
 先閱讀最新原報告、前輪 T2-R1 交辦、另三份第三階段報告與原 review-report。審查實際程式差異、測試與操作，不只依本文件宣告通過。先判 T2-UI1，再核對既有錯誤、忙碌互斥、進度保存、其他面板操作及 A／R1／R2、N1／N2、S1–S6／F1–F6 未退化。新結果寫入 `docs/third-phase-t2-ui1-review-report.md`，原報告保留；問題附位置、條件、影響、證據與建議。未另授權，不自行修改、提交、推送、合併或發布。
 

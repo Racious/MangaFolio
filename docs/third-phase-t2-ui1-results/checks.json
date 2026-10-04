@@ -33,7 +33,7 @@
     }
   },
   "baselineSha": "1d62ec7f5203e32a533ff926d89c1cf3fb16820b",
-  "productSha": "T2_UI1_PRODUCT_SHA_PENDING",
+  "productSha": "b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f",
   "environment": "Linux; browser real Vue/Pinia/App timer + mock IPC; latest Windows/native Tauri not run",
   "diff-check": {
     "command": "git diff --check; git diff --cached --check",

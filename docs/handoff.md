@@ -2,7 +2,7 @@
 
 更新日期：2026-10-04（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、閱讀狀態、標籤、自訂資訊、匯入管理、三種可切換介面與備份還原、系列書架、下一集、書籤／筆記與安全備份。
 
-最新進度：独立複審確認 T1／T3、T2 核心及 T2-R1 後端已修復，另提既有面板殘留 T2-UI1；本次已修正面板重複保存錯誤，產品 `T2_UI1_PRODUCT_SHA_PENDING`。Linux npm21／Rust48、build／diff、八項新元件情境及兩支整合 script 通過。最新 Windows／獨立複審尚未執行，前輪 0b883c8 的 Windows49 是歷史證據。接手先讀 [最新 T2-UI1 交辦](third-phase-t2-ui1-handoff.md)，原四份報告完整保留。
+最新進度：独立複審確認 T1／T3、T2 核心及 T2-R1 後端已修復，另提既有面板殘留 T2-UI1；本次已修正面板重複保存錯誤，產品 `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`。Linux npm21／Rust48、build／diff、八項新元件情境及兩支整合 script 通過。最新 Windows／獨立複審尚未執行，前輪 0b883c8 的 Windows49 是歷史證據。接手先讀 [最新 T2-UI1 交辦](third-phase-t2-ui1-handoff.md)，原四份報告完整保留。
 
 ## 目前狀態
 

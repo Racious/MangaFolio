@@ -1,6 +1,6 @@
 # 第三階段 T1／T2／T3 修正複審交辦
 
-最新面板修正 **T2-UI1**：產品 `T2_UI1_PRODUCT_SHA_PENDING`，詳見 [本次交辦／完整驗證](third-phase-t2-ui1-handoff.md)。本次 Linux npm21／Rust48、build／diff、八項真實元件情境與兩支整合 script 通過；最新 Windows／原生流程未執行。前輪 0b883c8 的独立 Windows49 通過只涵蓋前輪；以下保留歷史交辦與證據。
+最新面板修正 **T2-UI1**：產品 `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`，詳見 [本次交辦／完整驗證](third-phase-t2-ui1-handoff.md)。本次 Linux npm21／Rust48、build／diff、八項真實元件情境與兩支整合 script 通過；最新 Windows／原生流程未執行。前輪 0b883c8 的独立 Windows49 通過只涵蓋前輪；以下保留歷史交辦與證據。
 
 最新 T2-R1 補強產品：`0b883c85e77ea8046fa851464c80a86fbbb7c513`，交辦與本次 Linux npm21／Rust48、build／diff 输出見 [T2-R1 修正交辦](third-phase-t2-r1-handoff.md)。最新 Windows 尚未執行；45568a8 的獨立 Windows47 通過不涵蓋本次。下方保留前輪歷史範圍與證據。
 
