@@ -12,7 +12,7 @@
     "exitCode": 0
   },
   "baselineSha": "52e30f5865a0596514f5fa9e03187c3f1e28a3cf",
-  "productSha": "T2_R1_PRODUCT_SHA_PENDING",
+  "productSha": "0b883c85e77ea8046fa851464c80a86fbbb7c513",
   "environment": "Linux; temporary Rust Fixture DB and sources; latest Windows / native Tauri not run",
   "diff-check": {
     "command": "git diff --check; git diff --cached --check",

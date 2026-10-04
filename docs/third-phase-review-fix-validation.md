@@ -1,6 +1,6 @@
 # T1／T2／T3 本次修正驗證
 
-最新 T2-R1 補強產品：`T2_R1_PRODUCT_SHA_PENDING`，交辦與本次 Linux npm21／Rust48、build／diff 输出見 [T2-R1 修正交辦](third-phase-t2-r1-handoff.md)。最新 Windows 尚未執行；45568a8 的獨立 Windows47 通過不涵蓋本次。下方保留前輪歷史範圍與證據。
+最新 T2-R1 補強產品：`0b883c85e77ea8046fa851464c80a86fbbb7c513`，交辦與本次 Linux npm21／Rust48、build／diff 输出見 [T2-R1 修正交辦](third-phase-t2-r1-handoff.md)。最新 Windows 尚未執行；45568a8 的獨立 Windows47 通過不涵蓋本次。下方保留前輪歷史範圍與證據。
 
 日期：2026-10-04 Asia/Tokyo。固定基準 `421d2acea22fccb7f2822848c80ac5a2a265270e`；對應產品 `45568a804b1228c9016f9a7fd2bd876218673b2e`。本次重跑，不引用歷史測試宣告最新程式通過。
 

@@ -2,7 +2,7 @@
 
 日期：2026-10-04（Asia/Tokyo）。分支：`feature/series-library-reading`。
 固定接手基準：`52e30f5865a0596514f5fa9e03187c3f1e28a3cf`，已包含上一輪複審報告。
-本次產品提交：`T2_R1_PRODUCT_SHA_PENDING`；後續固定 SHA／完整輸出的文件提交不另修改產品，以 Git 記錄辨識。
+本次產品提交：`0b883c85e77ea8046fa851464c80a86fbbb7c513`；後續固定 SHA／完整輸出的文件提交不另修改產品，以 Git 記錄辨識。
 前輪產品：`45568a804b1228c9016f9a7fd2bd876218673b2e`。
 
 ## 問題與修正
@@ -36,9 +36,9 @@
 
 ## 獨立複審範圍
 
-- 聚焦本次：`52e30f5865a0596514f5fa9e03187c3f1e28a3cf` → `T2_R1_PRODUCT_SHA_PENDING`。
-- 累積修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `T2_R1_PRODUCT_SHA_PENDING`。
-- 整體第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `T2_R1_PRODUCT_SHA_PENDING`。
+- 聚焦本次：`52e30f5865a0596514f5fa9e03187c3f1e28a3cf` → `0b883c85e77ea8046fa851464c80a86fbbb7c513`。
+- 累積修正：`421d2acea22fccb7f2822848c80ac5a2a265270e` → `0b883c85e77ea8046fa851464c80a86fbbb7c513`。
+- 整體第三階段：`e38f7a84c33126e11a141d10c0f38f4defb8985f` → `0b883c85e77ea8046fa851464c80a86fbbb7c513`。
 
 同時讀 `third-phase-review-fix-report.md`、另兩份第三階段原報告、前輪交辦與原 review-report；檢查真實程式差異及測試，先判定 T2-R1，再核對 T1／T3、A／R1／R2、N1／N2、S1–S6／F1–F6 是否退化。特別檢查只清除已恢復的階段、不誤清建立失敗、失敗仍回傳錯誤、成功時間與檔案數穩定、未知檔保護。新結果寫入 `docs/third-phase-t2-r1-review-report.md`，不覆寫既有報告。問題提供位置、觸發條件、影響、證據與建議；未另授權，不自行修改、提交、推送、合併或發布。
 
