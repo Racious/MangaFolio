@@ -1,0 +1,21 @@
+{
+  "npm-test": {
+    "command": "npm test",
+    "exitCode": 0
+  },
+  "npm-build": {
+    "command": "npm run build",
+    "exitCode": 0
+  },
+  "cargo-test": {
+    "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "exitCode": 0
+  },
+  "baselineSha": "52e30f5865a0596514f5fa9e03187c3f1e28a3cf",
+  "productSha": "T2_R1_PRODUCT_SHA_PENDING",
+  "environment": "Linux; temporary Rust Fixture DB and sources; latest Windows / native Tauri not run",
+  "diff-check": {
+    "command": "git diff --check; git diff --cached --check",
+    "exitCode": 0
+  }
+}

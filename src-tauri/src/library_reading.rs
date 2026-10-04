@@ -398,6 +398,107 @@ mod tests {
         assert!(bad.backup_settings().unwrap().last_success.is_none());
     }
     #[test]
+    fn consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup() {
+        // Cover both the daily gate and disabled scheduling; recovery must precede either.
+        for enabled in [true, false] {
+            let f = Fixture::new();
+            let l = f.library();
+            l.register(&f.book()).unwrap();
+            l.set_backup_settings(true, 1).unwrap();
+            l.automatic_backup(true).unwrap();
+            let dir = f.0.join("data/backups");
+            let unknown = dir.join("mangafolio-auto-1-2-3.json");
+            let unknown_bytes = l.backup_json().unwrap();
+            std::fs::write(&unknown, &unknown_bytes).unwrap();
+            let other = dir.join("unknown.json");
+            std::fs::write(&other, b"keep unknown").unwrap();
+            let snapshot = dir.join("mangafolio-preupgrade-1-2-3.sqlite3");
+            std::fs::write(&snapshot, b"keep snapshot").unwrap();
+            l.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_cleanup BEFORE DELETE ON automatic_backups BEGIN SELECT RAISE(ABORT,'cleanup failed'); END;").unwrap();
+            let first = l.automatic_backup(true).unwrap_err();
+            assert!(first.starts_with("備份已建立，但保留清理失敗"));
+            let success = l.backup_settings().unwrap().last_success;
+            assert!(success.is_some());
+            let second = l.automatic_backup(false).unwrap_err();
+            assert!(second.starts_with("備份狀態恢復／清理失敗"));
+            assert_eq!(l.backup_settings().unwrap().last_error, second);
+            assert_eq!(l.backup_settings().unwrap().last_success, success);
+            let kept_path = std::fs::read_dir(&dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .find(|path| {
+                    path != &unknown
+                        && path
+                            .file_name()
+                            .unwrap()
+                            .to_string_lossy()
+                            .starts_with("mangafolio-auto-")
+                })
+                .unwrap();
+            let kept_bytes = std::fs::read(&kept_path).unwrap();
+            l.connection
+                .lock()
+                .unwrap()
+                .execute_batch("DROP TRIGGER fail_cleanup;")
+                .unwrap();
+            l.set_backup_settings(enabled, 1).unwrap();
+            let settings = l.automatic_backup(false).unwrap();
+            assert!(
+                settings.last_error.is_empty(),
+                "recovered but stale error remains: {}",
+                settings.last_error
+            );
+            assert_eq!(settings.last_success, success);
+            assert_eq!(settings.enabled, enabled);
+            let names = {
+                let conn = l.connection.lock().unwrap();
+                let mut q = conn.prepare("SELECT name FROM automatic_backups").unwrap();
+                q.query_map([], |r| r.get::<_, String>(0))
+                    .unwrap()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap()
+            };
+            assert_eq!(names.len(), 1);
+            let path = dir.join(&names[0]);
+            let bytes = std::fs::read(&path).unwrap();
+            assert_eq!(path, kept_path);
+            assert_eq!(bytes, kept_bytes);
+            assert!(Library::parse_backup(&bytes).is_ok());
+            assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 4);
+            assert_eq!(std::fs::read(&unknown).unwrap(), unknown_bytes);
+            assert_eq!(std::fs::read(&other).unwrap(), b"keep unknown");
+            assert_eq!(std::fs::read(&snapshot).unwrap(), b"keep snapshot");
+            // Recovery remains settled on the following check; no extra JSON or timestamp bump.
+            let settled = l.automatic_backup(false).unwrap();
+            assert!(settled.last_error.is_empty());
+            assert_eq!(settled.last_success, success);
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 4);
+        }
+    }
+    #[test]
+    fn cleanup_success_does_not_clear_unrecovered_backup_creation_error() {
+        let f = Fixture::new();
+        let l = f.library();
+        l.register(&f.book()).unwrap();
+        l.set_backup_settings(true, 1).unwrap();
+        l.automatic_backup(true).unwrap();
+        let success = l.backup_settings().unwrap().last_success;
+        l.connection.lock().unwrap().execute_batch("CREATE TRIGGER fail_register BEFORE INSERT ON automatic_backups BEGIN SELECT RAISE(ABORT,'manifest failed'); END;").unwrap();
+        let error = l.automatic_backup(true).unwrap_err();
+        assert!(error.starts_with("備份擁有權登記失敗"));
+        for enabled in [false, true] {
+            l.set_backup_settings(enabled, 1).unwrap();
+            let settings = l.automatic_backup(false).unwrap();
+            assert_eq!(settings.last_error, error); // A successful cleanup did not retry creation.
+            assert_eq!(settings.last_success, success);
+            assert_eq!(
+                std::fs::read_dir(f.0.join("data/backups")).unwrap().count(),
+                1
+            );
+        }
+    }
+    #[test]
     fn automatic_manifest_failure_never_leaves_complete_unregistered_json_or_success_time() {
         let f = Fixture::new();
         let l = f.library();

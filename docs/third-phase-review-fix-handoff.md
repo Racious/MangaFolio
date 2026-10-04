@@ -1,5 +1,7 @@
 # 第三階段 T1／T2／T3 修正複審交辦
 
+最新 T2-R1 補強產品：`T2_R1_PRODUCT_SHA_PENDING`，交辦與本次 Linux npm21／Rust48、build／diff 输出見 [T2-R1 修正交辦](third-phase-t2-r1-handoff.md)。最新 Windows 尚未執行；45568a8 的獨立 Windows47 通過不涵蓋本次。下方保留前輪歷史範圍與證據。
+
 日期：2026-10-04（Asia/Tokyo）。分支：`feature/series-library-reading`。
 
 固定接手基準：`421d2acea22fccb7f2822848c80ac5a2a265270e`（已含兩份獨立審查報告）。

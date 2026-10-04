@@ -93,3 +93,7 @@
 ## 2026-10-04 第三階段 T1／T2／T3 修正
 
 接手基準 421d2acea22fccb7f2822848c80ac5a2a265270e，工作區乾淨，保留兩份原報告。修正 Windows 快照 sync handle、DDL 假通過防護、自動 JSON 登記／成功時間／重啟重試、已刪檔 manifest 清理，以及 >60 本／系列與窄視窗返回位置。產品 45568a804b1228c9016f9a7fd2bd876218673b2e；無 schema 遷移、無用戶資料操作、無主線合併或發布。Linux npm21／Rust46、build、diff check、四支 browser script 通過，完整輸出与待 Windows 複驗見 third-phase-review-fix-validation.md／handoff.md。
+
+## 2026-10-04 T2-R1 連續恢復失敗補強
+
+接手 52e30f5865a0596514f5fa9e03187c3f1e28a3cf；工作區乾淨、保留三份原第三階段審查。先以新回歸在原產品重現過期錯誤（exit101），再補恢復／清理成功的錯誤清除條件，共用現有階段文案常數。新增停用與 24h gate 內連續失敗恢復，以及未恢復建立錯誤不得清除的兩項測試。產品 T2_R1_PRODUCT_SHA_PENDING；Linux48／npm21、build／diff 通過，完整輸出與待 Windows 項目見 third-phase-t2-r1-handoff.md。未碰使用者 DB，無 schema／新功能、無主線合併或發布。

@@ -2,7 +2,7 @@
 
 更新日期：2026-10-04（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、閱讀狀態、標籤、自訂資訊、匯入管理、三種可切換介面與備份還原、系列書架、下一集、書籤／筆記與安全備份。
 
-最新進度：已按第三階段兩份審查報告修正 T1／T2／T3，產品 `45568a804b1228c9016f9a7fd2bd876218673b2e`。本次 Linux 21／46 與 browser 回歸通過；最新 Windows／獨立複審未執行。接手先看 [修正交辦](third-phase-review-fix-handoff.md) 與 [驗證](third-phase-review-fix-validation.md)，原報告保留。
+最新進度：第三階段獨立複審確認 T1／T3 通過，T2 核心問題已修正、尚有 T2-R1；本次已補強連續清理失敗後的錯誤恢復，產品 `T2_R1_PRODUCT_SHA_PENDING`。本次 Linux npm21／Rust48、build／diff 通過；最新 Windows／獨立複審未執行。前輪 45568a8 的 Windows47／npm21 是歷史證據。接手先看 [最新 T2-R1 交辦](third-phase-t2-r1-handoff.md)，三份原報告完整保留。
 
 ## 目前狀態
 

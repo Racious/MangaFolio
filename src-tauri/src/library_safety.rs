@@ -2,6 +2,7 @@ use super::*;
 use std::io::Read;
 use std::sync::atomic::{AtomicU64, Ordering};
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+const RECOVERY_FAILURE_PREFIX: &str = "備份狀態恢復／清理失敗";
 fn unique_name(prefix: &str, extension: &str) -> String {
     format!(
         "mangafolio-{prefix}-{}-{}-{}.{}",
@@ -245,7 +246,12 @@ impl Library {
             {
                 phase = "保留清理";
                 self.clean_automatic_files(&files, settings.retention)?;
-                if recovered || settings.last_error.starts_with("備份已建立") {
+                // Both recovery and retention succeeded. Clear their prior errors,
+                // including a failed retry; creation errors remain until creation is retried.
+                if recovered
+                    || settings.last_error.starts_with("備份已建立")
+                    || settings.last_error.starts_with(RECOVERY_FAILURE_PREFIX)
+                {
                     self.connection
                         .lock()
                         .map_err(db_error)?
@@ -307,7 +313,7 @@ impl Library {
                 )
             } else if phase == "成功狀態更新" || phase == "狀態恢復" || phase == "保留清理"
             {
-                format!("備份狀態恢復／清理失敗；未清理檔案保留，下次檢查會重試：{error}")
+                format!("{RECOVERY_FAILURE_PREFIX}；未清理檔案保留，下次檢查會重試：{error}")
             } else {
                 format!("備份{phase}失敗；未建立完整新備份，既有成功備份已保留：{error}")
             };
