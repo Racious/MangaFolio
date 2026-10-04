@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import BookCover from "./BookCover.vue";
 import BookmarksPanel from "./BookmarksPanel.vue";
 import type { LibraryBook } from "../api/library";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
-import { progressPercent, statusLabels } from "../lib/library";
+import { progressPercent, statusLabels, displayPath } from "../lib/library";
 import { nextVolume } from "../lib/series";
 const props = defineProps<{ book: LibraryBook }>();
 const emit = defineEmits<{
@@ -30,12 +30,39 @@ const busy = computed(
     library.favoritePending.size > 0,
 );
 let focus: HTMLElement | null = null;
+const wideScreen = window.matchMedia("(min-width: 1100px)");
+const modal = ref(!wideScreen.matches);
+function updateMode() {
+  const panel = dialog.value;
+  if (!panel) return;
+  const active = document.activeElement as HTMLElement | null;
+  const switching = panel.open;
+  panel.close();
+  modal.value = !wideScreen.matches;
+  if (modal.value) panel.showModal();
+  else panel.show();
+  if (switching && active?.isConnected) active.focus({ preventScroll: true });
+}
+function escape(event: KeyboardEvent) {
+  if (modal.value || event.key !== "Escape" || busy.value) return;
+  // An editor or native modal owns Escape while it overlays the sidebar.
+  if (document.querySelector("dialog:modal")) return;
+  event.preventDefault();
+  emit("close");
+}
+watch(() => book.value.id, () => {
+  if (dialog.value) dialog.value.scrollTop = 0;
+}, { flush: "post" });
 onMounted(() => {
   focus = document.activeElement as HTMLElement;
-  dialog.value?.showModal();
+  updateMode();
+  wideScreen.addEventListener("change", updateMode);
+  window.addEventListener("keydown", escape);
 });
 onUnmounted(() => {
-  if (focus?.isConnected) focus.focus();
+  wideScreen.removeEventListener("change", updateMode);
+  window.removeEventListener("keydown", escape);
+  if (focus?.isConnected) focus.focus({ preventScroll: true });
 });
 async function read(id: number) {
   if (busy.value) return;
@@ -50,6 +77,7 @@ async function read(id: number) {
     ref="dialog"
     class="detail-panel"
     role="dialog"
+    :aria-modal="modal"
     aria-labelledby="book-detail-title"
     @cancel="busy ? $event.preventDefault() : emit('close')"
   >
@@ -92,7 +120,7 @@ async function read(id: number) {
       <dt>來源</dt>
       <dd>
         {{ book.available ? "可存取" : "來源失效；資料保留"
-        }}<span class="path">{{ book.path }}</span>
+        }}<span class="path">{{ displayPath(book.path) }}</span>
       </dd>
     </dl>
     <p class="note">{{ book.notes || "尚無備註。" }}</p>
@@ -125,7 +153,7 @@ async function read(id: number) {
         {{ next.book.title }}
       </button>
     </section>
-    <BookmarksPanel :book-id="book.id" @opened="emit('close')" />
+    <BookmarksPanel :key="book.id" :book-id="book.id" @opened="emit('close')" />
   </dialog>
 </template>
 <style scoped>
@@ -143,6 +171,7 @@ async function read(id: number) {
   color: var(--text);
   padding: 24px;
   overflow: auto;
+  z-index: 20;
 }
 header {
   display: flex;

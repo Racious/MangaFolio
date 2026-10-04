@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import {
   listBookmarks,
   saveBookmark,
@@ -50,10 +50,14 @@ watch(
     editing.value = null;
     name.value = "";
     note.value = "";
+    marks.value = [];
+    error.value = "";
+    pageIndex.value = 0;
     void refresh();
   },
   { immediate: true },
 );
+onUnmounted(() => { generation++; });
 watch(
   () => props.indices,
   (indices) => {

@@ -12,9 +12,11 @@ try {
     `${directory}/ipc.mjs`,
     `export let handler; export const configure = fn => handler = fn;
     export const setFavorite = (...args) => handler(...args);
-    export const listLibrary = async () => []; export let importHandler; export const configureImport = fn => importHandler=fn; export const importBookResult = (...args) => importHandler(...args); export const listTags = async () => [];
+    export let listHandler; export const configureList = fn => listHandler=fn;
+    export const listLibrary = async () => listHandler ? listHandler() : []; export let importHandler; export const configureImport = fn => importHandler=fn; export const importBookResult = (...args) => importHandler(...args); export const listTags = async () => [];
     export let loadHandler,saveHandler; export const configureLoad=fn=>loadHandler=fn; export const configureSave=fn=>saveHandler=fn; export const saveProgress = async (...args) => saveHandler?.(...args); export const openPath = async () => {};
-    export const openLibraryBook = async (...args) => loadHandler?.(...args); export const openBookmark = async (...args) => loadHandler?.(...args); export const renderPageUrl = async () => '';`,
+    export let renderHandler; export const configureRender = fn => renderHandler=fn;
+    export const openLibraryBook = async (...args) => loadHandler?.(...args); export const openBookmark = async (...args) => loadHandler?.(...args); export const renderPageUrl = async () => renderHandler ? renderHandler() : '';`,
   );
   for (const name of ["reader", "library"]) {
     let source = await readFile(
@@ -31,6 +33,7 @@ try {
       .replaceAll('"../api/library"', '"./ipc.mjs"')
       .replaceAll('"../api/backend"', '"./ipc.mjs"')
       .replaceAll('"./reader"', '"./reader.mjs"')
+      .replaceAll('"./library"', '"./library.mjs"')
       .replaceAll('"../lib/library"', '"./helpers.mjs"')
       .replaceAll('"../lib/import"', '"./imports.mjs"');
     await writeFile(`${directory}/${name}.mjs`, js);
@@ -61,10 +64,11 @@ try {
   const { useReaderStore } = await import(
     pathToFileURL(`${directory}/reader.mjs`)
   );
-  const { configure, configureImport, configureLoad, configureSave } = await import(
+  const { configure, configureImport, configureLoad, configureSave, configureList, configureRender } = await import(
     pathToFileURL(`${directory}/ipc.mjs`)
   );
   function setup() {
+    configureList(undefined);
     setActivePinia(createPinia());
     const library = useLibraryStore(),
       reader = useReaderStore();
@@ -72,6 +76,75 @@ try {
     reader.bookId = 1;
     return { library, reader, book: library.books[0] };
   }
+  test("success notices expire after five seconds and never clear errors or newer results", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { library } = setup();
+    library.error = "重要錯誤";
+    library.notifySuccess("保存成功");
+    t.mock.timers.tick(4000);
+    assert.equal(library.importNotice, "保存成功");
+    library.notifySuccess("備份成功");
+    t.mock.timers.tick(1000);
+    assert.equal(library.importNotice, "備份成功");
+    t.mock.timers.tick(4000);
+    assert.equal(library.importNotice, "");
+    assert.equal(library.error, "重要錯誤");
+    library.notifySuccess("保存成功");
+    library.importNotice = "新增 0 本，失敗／衝突 1 本";
+    t.mock.timers.tick(5000);
+    assert.match(library.importNotice, /失敗／衝突/);
+    t.mock.timers.reset();
+  });
+  test("failed open refreshes availability and missing filter rechecks restored sources", async () => {
+    const { library, reader } = setup();
+    library.books = [{ id: 1, title: "Missing", available: true, tags: [] }];
+    let available = false, lists = 0;
+    configureList(async () => { lists++; return [{ id: 1, title: "Missing", available, tags: [] }]; });
+    configureLoad(async () => { throw new Error('路徑不存在：\\\\?\\C:\\books\\missing.zip'); });
+    assert.equal(await reader.openBook(1), false);
+    assert.equal(library.books[0].available, false);
+    assert.equal(reader.missingBookId, 1);
+    assert.equal(lists, 1);
+    assert.match(reader.error, /前往「來源失效」/);
+    assert.equal(reader.error.includes('\\\\?\\'), false);
+    await library.setFilter("missing");
+    assert.deepEqual(library.visibleBooks.map(b => b.id), [1]);
+    available = true;
+    await library.setFilter("missing");
+    assert.deepEqual(library.visibleBooks, []);
+    assert.equal(lists, 3);
+    configureList(undefined);
+  });
+  test("unrelated errors and the next successful open clear stale missing-source recovery", async () => {
+    const { reader } = setup();
+    configureList(async () => [{ id: 1, available: true, tags: [] }]);
+    reader.missingBookId = 1;
+    configureLoad(async () => { throw new Error("壓縮檔損毀，來源仍存在"); });
+    assert.equal(await reader.openBook(1), false);
+    assert.equal(reader.missingBookId, null);
+    assert.doesNotMatch(reader.error, /前往「來源失效」/);
+    reader.missingBookId = 1;
+    configure(async () => { throw new Error("收藏失敗"); });
+    await reader.toggleFavorite();
+    assert.equal(reader.missingBookId, null);
+    reader.missingBookId = 1;
+    reader.pages = ["page.png"]; reader.viewportW = 640; reader.viewportH = 480;
+    configureRender(async () => { throw new Error("算繪失敗"); });
+    await reader.render();
+    assert.match(reader.error, /算繪失敗/);
+    assert.equal(reader.missingBookId, null);
+    configureRender(undefined); reader.viewportW = 0; reader.viewportH = 0;
+    reader.missingBookId = 1;
+    configureLoad(async () => ({ bookId: 2, sessionId: 2, title: "新書", pages: ["page.png"],
+      preferences: {}, startIndex: 0, favorite: false }));
+    assert.equal(await reader.openBook(2), true);
+    assert.equal(reader.error, "");
+    assert.equal(reader.missingBookId, null);
+    reader.missingBookId = 1;
+    reader.discardBook();
+    assert.equal(reader.missingBookId, null);
+    configureList(undefined);
+  });
   test("switching volume waits for save and preserves current book when save/open fails",async()=>{
     const {reader}=setup();reader.pages=["1.png","2.png"];reader.index=1;reader.title="Current";
     const before=JSON.stringify([reader.bookId,reader.pages,reader.index,reader.title]);let called=false;

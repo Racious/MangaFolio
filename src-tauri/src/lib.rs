@@ -51,6 +51,9 @@ pub fn run() {
             library::delete_bookmark,
             library::preview_library_backup,
             library::get_backup_settings,
+            library::get_backup_directory,
+            library::open_backup_directory,
+            library::set_backup_directory,
             library::set_backup_settings,
             library::run_automatic_backup,
             library::restore_library_backup

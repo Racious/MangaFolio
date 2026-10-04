@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from "vue";
 import { editBook, type LibraryBook } from "../api/library";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
+import { displayPath } from "../lib/library";
 const props = defineProps<{ book: LibraryBook }>();
 const emit = defineEmits<{ close: [] }>();
 const library = useLibraryStore(),
@@ -34,7 +35,7 @@ async function save() {
     const updated = await editBook(props.book.id, details.value);
     if (reader.bookId === updated.id) reader.title = updated.title;
     await library.refresh();
-    library.importNotice = "書籍資訊已保存，來源檔案未更名。";
+    library.notifySuccess("書籍資訊已保存，來源檔案未更名。");
     emit("close");
   } catch (e) {
     error.value = String(e);
@@ -52,7 +53,7 @@ async function save() {
     <form @submit.prevent="save">
       <h2 id="edit-title">編輯書籍資訊</h2>
       <p class="source">
-        原始來源名稱：{{ book.sourceTitle }}<br />{{ book.path }}
+        原始來源名稱：{{ book.sourceTitle }}<br />{{ displayPath(book.path) }}
       </p>
       <label
         >自訂書名<input

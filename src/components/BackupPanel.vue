@@ -5,17 +5,21 @@ import {
   previewBackup,
   restoreBackup,
   exportBackup,
+  openBackupDirectory,
   type RestorePreview,
 } from "../api/library";
+import { pickFolder } from "../api/backend";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 import { useBackupStore } from "../stores/backup";
+import { displayPath } from "../lib/library";
 const library = useLibraryStore(),
   reader = useReaderStore(),
   backup = useBackupStore();
 const path = ref(""),
   preview = ref<RestorePreview | null>(null),
   error = ref("");
+const backupDirectory = computed(() => backup.settings.directory);
 const busy = computed(
   () =>
     library.managing ||
@@ -26,7 +30,20 @@ const busy = computed(
     library.favoritePending.size > 0 ||
     backup.pending,
 );
-onMounted(() => void backup.refresh());
+onMounted(() => {
+  void backup.refresh();
+});
+async function chooseDirectory(reset = false) {
+  await run(async () => {
+    const selected = reset ? null : await pickFolder();
+    if (!reset && !selected) return;
+    if (await backup.changeDirectory(selected))
+      library.notifySuccess(reset ? "備份資料夾已恢復預設；舊備份留在原處。" : "備份資料夾已更新；舊備份留在原處。");
+  });
+}
+async function openDirectory() {
+  await run(() => openBackupDirectory());
+}
 async function run(action: () => Promise<void>) {
   if (busy.value) return;
   library.managing = true;
@@ -49,7 +66,7 @@ async function manual() {
     if (!selected) return;
     await exportBackup(selected);
     await backup.refresh();
-    library.importNotice = "備份已匯出；不包含漫畫來源檔案。";
+    library.notifySuccess(`備份已匯出至：${displayPath(selected)}；不包含漫畫來源檔案。`);
   });
 }
 async function inspect() {
@@ -75,7 +92,7 @@ async function restore() {
     reader.discardBook();
     library.selectedIds = [];
     await library.refresh();
-    library.importNotice = `已合併還原 ${result.added} 本書，略過 ${result.skipped} 本既有來源。`;
+    library.notifySuccess(`已合併還原 ${result.added} 本書，略過 ${result.skipped} 本既有來源。`);
   });
 }
 async function automatic() {
@@ -83,7 +100,7 @@ async function automatic() {
     await backup.maintain(true);
     // Automatic errors belong to the store so scheduled recovery updates this panel.
     if (!backup.error && !backup.settings.lastError)
-      library.importNotice = "本機安全備份已建立。";
+      library.notifySuccess("本機安全備份已建立。");
   });
 }
 </script>
@@ -134,14 +151,25 @@ async function automatic() {
             : "尚無備份"
         }}
       </p>
-      <p>升級前 SQLite 快照另行保存，不依自動保留數清理。</p>
+      <p class="path">備份資料夾：{{ backupDirectory ? displayPath(backupDirectory) : '正在取得位置…' }}</p>
+      <p v-if="backup.settings.customDirectory && backup.settings.customDirectory !== backupDirectory" class="path">
+        設定的自訂資料夾：{{ displayPath(backup.settings.customDirectory) }}
+      </p>
+      <div class="panel-actions">
+        <button :disabled="busy" @click="chooseDirectory()">選擇備份資料夾</button>
+        <button :disabled="busy || !backup.settings.customDirectory" @click="chooseDirectory(true)">恢復預設</button>
+      </div>
+      <button :disabled="busy || !backupDirectory" @click="openDirectory">開啟備份資料夾</button>
+      <p>更換資料夾後，舊備份留在原處、不自動搬移；舊資料夾中由本程式建立並登記的備份仍計入保留份數，超過時會由最舊的開始清除。舊資料夾無法存取時不會清除其中的備份。</p>
+      <p>升級前 SQLite 快照保存在預設 backups 資料夾，不依自動保留數清理。</p>
     </section>
+    <p v-if="backup.settings.directoryWarning" role="alert" class="error">{{ displayPath(backup.settings.directoryWarning) }}</p>
     <p
       v-if="error || backup.error || backup.settings.lastError"
       role="alert"
       class="error"
     >
-      {{ error || backup.error || backup.settings.lastError }}
+      {{ displayPath(error || backup.error || backup.settings.lastError) }}
     </p>
     <section v-if="preview" class="restore-preview" aria-label="還原預覽">
       <h3>還原預覽</h3>

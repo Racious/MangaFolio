@@ -227,10 +227,10 @@ impl Library {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_error)?;
-        if version > 3 {
+        if version > 4 {
             return Err("書庫來自較新版本，請更新 MangaFolio；原始資料已保留。".into());
         }
-        if version == 1 || version == 2 {
+        if (1..=3).contains(&version) {
             safety::upgrade_snapshot(&connection, directory)?;
         }
         connection
@@ -255,6 +255,9 @@ impl Library {
         }
         if version == 2 {
             reading::migrate(&mut connection)?;
+        }
+        if version < 4 {
+            safety::migrate(&mut connection, directory)?;
         }
         let covers = directory.join("covers");
         std::fs::create_dir_all(&covers).map_err(db_error)?;
@@ -1352,7 +1355,7 @@ mod tests {
                 .unwrap()
                 .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            3
+            4
         );
     }
 
@@ -1875,7 +1878,7 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch("PRAGMA user_version=4")
+            .execute_batch("PRAGMA user_version=5")
             .unwrap();
         drop(library);
         assert!(f.library_result().is_err());

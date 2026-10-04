@@ -226,6 +226,9 @@ const sortedBooks = computed(() => {
     : sortBooks(books, sort.value);
 });
 const shownBooks = computed(() => sortedBooks.value.slice(0, limit.value));
+const hiddenSelectionCount = computed(() =>
+  selectedIds.value.filter(id => !shownBooks.value.some(book => book.id === id)).length,
+);
 // Selection survives appearance/filter changes; only removed records are dropped.
 watch(() => [library.query, library.sort, library.filter, library.statusFilter, library.tagFilter], () => {
   library.bookLimit = 60;
@@ -331,9 +334,9 @@ const resultLabels = {
           }"
           :disabled="library.managing"
           @click="
-            library.filter = filter.id;
             library.section = 'books';
             library.activeSeries = null;
+            library.setFilter(filter.id);
           "
         >
           <span class="nav-label"
@@ -539,6 +542,8 @@ const resultLabels = {
         v-if="managementOpen"
         :selected-ids="selectedIds"
         :shown-count="shownBooks.length"
+        :hidden-count="hiddenSelectionCount"
+        @retain-shown="selectedIds = selectedIds.filter(id => shownBooks.some(book => book.id === id))"
         @clear="selectedIds = []"
         @select-shown="
           selectedIds = Array.from(
@@ -552,6 +557,15 @@ const resultLabels = {
       </p>
       <p v-if="reader.error" class="notice error" role="alert">
         {{ reader.error }}
+        <button v-if="reader.missingBookId !== null" :disabled="busy" @click="
+          library.section = 'books';
+          library.activeSeries = null;
+          library.query = '';
+          library.statusFilter = 'all';
+          library.tagFilter = null;
+          managementOpen = true;
+          library.setFilter('missing');
+        ">前往來源失效／重新指定</button>
       </p>
       <p v-if="library.importNotice" class="notice" role="status">
         {{ library.importNotice }}
@@ -665,7 +679,7 @@ const resultLabels = {
           {{ sortedBooks.length }} 本書{{ reader.loading ? " · 正在開啟…" : ""
           }}{{
             managementOpen
-              ? ` · 已選 ${selectedIds.length} 本（包含其他篩選中的選取）`
+              ? ` · 已選 ${selectedIds.length} 本${hiddenSelectionCount ? `（包含 ${hiddenSelectionCount} 本未顯示的選取）` : ''}`
               : ""
           }}
         </p>
@@ -722,7 +736,6 @@ const resultLabels = {
       @close="detailBook = null"
       @edit="
         editingBook = $event;
-        detailBook = null;
       "
       @manage="
         selectedIds = [$event.id];

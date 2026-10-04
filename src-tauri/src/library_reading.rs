@@ -452,16 +452,16 @@ mod tests {
             assert_eq!(settings.enabled, enabled);
             let names = {
                 let conn = l.connection.lock().unwrap();
-                let mut q = conn.prepare("SELECT name FROM automatic_backups").unwrap();
+                let mut q = conn.prepare("SELECT path FROM automatic_backups").unwrap();
                 q.query_map([], |r| r.get::<_, String>(0))
                     .unwrap()
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap()
             };
             assert_eq!(names.len(), 1);
-            let path = dir.join(&names[0]);
+            let path = PathBuf::from(&names[0]);
             let bytes = std::fs::read(&path).unwrap();
-            assert_eq!(path, kept_path);
+            assert_eq!(path, std::fs::canonicalize(kept_path).unwrap());
             assert_eq!(bytes, kept_bytes);
             assert!(Library::parse_backup(&bytes).is_ok());
             assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 4);

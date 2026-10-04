@@ -107,6 +107,9 @@ export interface BackupSettings {
   retention: number;
   lastSuccess: number | null;
   lastError: string;
+  customDirectory: string | null;
+  directory: string;
+  directoryWarning: string;
 }
 export interface RestorePreview {
   added: number;
@@ -129,6 +132,10 @@ export const previewBackup = (path: string) =>
   invoke<RestorePreview>("preview_library_backup", { path });
 export const getBackupSettings = () =>
   invoke<BackupSettings>("get_backup_settings");
+export const getBackupDirectory = () => invoke<string>("get_backup_directory");
+export const openBackupDirectory = () => invoke<void>("open_backup_directory");
+export const setBackupDirectory = (path: string | null) =>
+  invoke<BackupSettings>("set_backup_directory", { path });
 export const setBackupSettings = (enabled: boolean, retention: number) =>
   invoke<BackupSettings>("set_backup_settings", { enabled, retention });
 export const runAutomaticBackup = (force = false) =>

@@ -2,7 +2,7 @@
 import { PhStar, PhPencilSimple } from "@phosphor-icons/vue";
 import { onMounted, onUnmounted, ref } from "vue";
 import { loadCover } from "../api/covers";
-import { progressPercent, statusLabels } from "../lib/library";
+import { progressPercent, statusLabels, displayPath } from "../lib/library";
 import type { LibraryBook } from "../api/library";
 
 const props = defineProps<{
@@ -25,6 +25,15 @@ const cover = ref<string | null>(null);
 const coverFailed = ref(false);
 let observer: IntersectionObserver | null = null;
 let cancelled = false;
+function activateCard() {
+  if (props.opening) return;
+  if (props.selectable) emit("select", props.book.id);
+  else emit("edit", props.book);
+}
+function activateCover() {
+  if (props.selectable) activateCard();
+  else if (!props.opening && props.book.available) emit("open", props.book.id);
+}
 onMounted(() => {
   if (!props.book.available) return;
   observer = new IntersectionObserver(
@@ -58,26 +67,35 @@ onUnmounted(() => {
   <article
     ref="element"
     class="book-card"
+    @click="activateCard"
     :class="[
       view ?? 'grid',
       { offline: !book.available, picked: selectable && selected, focused },
     ]"
   >
-    <label v-if="selectable" class="selection">
+    <button
+      class="card-action"
+      :disabled="opening"
+      :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : `查看資訊：${book.title}`"
+      :aria-pressed="selectable ? !!selected : undefined"
+      @click.stop="activateCard"
+    ></button>
+    <label v-if="selectable" class="selection" @click.stop @keydown.stop>
       <input
         type="checkbox"
         :checked="selected"
         :disabled="opening"
-        :aria-label="`選取：${book.title}`"
+        :aria-label="`${selected ? '取消選取' : '選取'}：${book.title}`"
         @change="emit('select', book.id)"
       />
       選取
     </label>
     <button
       class="cover"
-      :disabled="opening || !book.available"
-      :aria-label="`${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
-      @click="emit('open', book.id)"
+      :disabled="opening || (!selectable && !book.available)"
+      :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : `${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
+      :aria-pressed="selectable ? !!selected : undefined"
+      @click.stop="activateCover"
     >
       <img v-if="cover" :src="cover" alt="" />
       <div v-else class="placeholder">
@@ -101,7 +119,7 @@ onUnmounted(() => {
         :aria-label="`${book.favorite ? '取消收藏' : '收藏'}：${book.title}`"
         :aria-pressed="book.favorite"
         :disabled="favoritePending"
-        @click="emit('favorite', book)"
+        @click.stop="emit('favorite', book)"
       >
         <PhStar
           :weight="book.favorite ? 'fill' : 'regular'"
@@ -123,7 +141,7 @@ onUnmounted(() => {
       </p>
       <p v-if="!book.available" class="offline-hint">
         來源無法存取 · 收藏與進度已保留
-        <span class="source-path">{{ book.path }}</span>
+        <span class="source-path">{{ displayPath(book.path) }}</span>
       </p>
       <p v-else class="page-count">
         {{
@@ -148,7 +166,7 @@ onUnmounted(() => {
         class="edit"
         :disabled="opening"
         :aria-label="`查看資訊：${book.title}`"
-        @click="emit('edit', book)"
+        @click.stop="emit('edit', book)"
       >
         <PhPencilSimple :size="14" aria-hidden="true" /> 查看資訊
       </button>
@@ -170,11 +188,34 @@ onUnmounted(() => {
   height: 16px;
 }
 .book-card {
+  position: relative;
   min-width: 0;
   background: var(--bg-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  cursor: pointer;
+}
+.card-action {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+  z-index: 1;
+}
+.card-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cover, .selection, .favorite, .edit {
+  z-index: 2;
+}
+.selection, .edit {
+  position: relative;
 }
 .cover {
   display: block;

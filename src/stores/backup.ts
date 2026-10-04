@@ -3,6 +3,7 @@ import {
   getBackupSettings,
   runAutomaticBackup,
   setBackupSettings,
+  setBackupDirectory,
   type BackupSettings,
 } from "../api/library";
 export const useBackupStore = defineStore("backup", {
@@ -12,6 +13,9 @@ export const useBackupStore = defineStore("backup", {
       retention: 5,
       lastSuccess: null,
       lastError: "",
+      customDirectory: null,
+      directory: "",
+      directoryWarning: "",
     } as BackupSettings,
     pending: false,
     error: "",
@@ -33,6 +37,20 @@ export const useBackupStore = defineStore("backup", {
         this.settings = await setBackupSettings(enabled, retention);
       } catch (e) {
         this.error = String(e);
+      } finally {
+        this.pending = false;
+      }
+    },
+    async changeDirectory(path: string | null) {
+      if (this.pending) return false;
+      this.pending = true;
+      this.error = "";
+      try {
+        this.settings = await setBackupDirectory(path);
+        return true;
+      } catch (e) {
+        this.error = String(e);
+        return false;
       } finally {
         this.pending = false;
       }
