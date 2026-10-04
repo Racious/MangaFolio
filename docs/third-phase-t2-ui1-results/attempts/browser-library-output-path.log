@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/workspace/MangaFolio-management-ui/scripts/validate-next-phase.py", line 246, in <module>
+    result={'exitCode':0,'checks':checks,'pageErrors':errors,'contrast':contrast,'boundary':'Mock IPC / browser integration; not native acceptance','screenshots':str(images.relative_to(root))}
+                                                                                                                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 682, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: '/tmp/mangafolio-t2-ui1-library-screens' is not in the subpath of '/workspace/MangaFolio-management-ui'

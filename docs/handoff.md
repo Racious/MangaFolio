@@ -1,19 +1,21 @@
 # 書庫功能開發交接
 
-更新日期：2026-10-03（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、閱讀狀態、標籤、自訂資訊、匯入管理、三種可切換介面與備份還原。
+更新日期：2026-10-04（Asia/Tokyo）。範圍：本機書庫、收藏、搜尋、續讀、閱讀狀態、標籤、自訂資訊、匯入管理、三種可切換介面與備份還原、系列書架、下一集、書籤／筆記與安全備份。
+
+最新進度：独立複審確認 T1／T3、T2 核心及 T2-R1 後端已修復，另提既有面板殘留 T2-UI1；本次已修正面板重複保存錯誤，產品 `b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f`。Linux npm21／Rust48、build／diff、八項新元件情境及兩支整合 script 通過。最新 Windows／獨立複審尚未執行，前輪 0b883c8 的 Windows49 是歷史證據。接手先讀 [最新 T2-UI1 交辦](third-phase-t2-ui1-handoff.md)，原四份報告完整保留。
 
 ## 目前狀態
 
 | 項目 | 狀態 |
 | --- | --- |
 | Repository | `Racious/MangaFolio` |
-| 開發分支 | `feature/library-management-ui`；固定基準 bac9674f，最終提交見本輪交辦 |
+| 開發分支 | `feature/series-library-reading`；固定基準 e38f7a8，產品 SHA 見第三階段交辦 |
 | 核心功能提交 | `06469a6`：本機書庫、收藏、搜尋與續讀 |
 | 教學功能提交 | `7fe4acb`：五步教學與附截圖文件 |
 | 管理與備份提交 | `df6c134`：批次管理、重新指定來源、備份與合併還原 |
 | 程式版本 | 仍為 `0.1.4`，未新增發版 tag |
-| 整合與發版 | 本次工作未合併 main、未建立 PR、未發布新安裝包 |
-| 審查 | 已自我檢查與測試；尚未完成獨立 Code Review、安全審查 |
+| 整合與發版 | 第三階段未合併 main、未發布；基準 e38f7a8 是先前已授權的 merge |
+| 審查 | 已自我檢查與測試；第三階段已完成首輪獨立審查並修正 T1–T3，最新修正尚待獨立複審／Windows 整體驗收；舊審查不涵蓋新增程式 |
 
 這是可試用的開發版。測試通過不代表完成正式審核或商業發版驗收。GitHub Releases 的既有安裝包尚未包含此分支功能。
 
@@ -29,7 +31,7 @@
 - 單本重新指定 ZIP／CBZ 或圖片資料夾，保留書籍 ID、收藏、閱讀設定與進度。
 - JSON 備份與合併還原，既有相同來源路徑保留、無效資料整批拒絕；匯出不覆寫既有檔案。
 
-本輪另完成閱讀狀態、標籤、自訂資訊、批次匯入结果、來源失效入口；三種風格和三種檢視獨立可切換，主題／密度／封面尺寸記憶。未提供遞迴掃描、頁面書籤、作者管理、全文搜尋或雲端同步。詳見 [本輪計畫](next-phase-plan.md)。
+本輪另完成閱讀狀態、標籤、自訂資訊、批次匯入结果、來源失效入口；三種風格和三種檢視獨立可切換，主題／密度／封面尺寸記憶。第三階段已擴充頁面書籤／筆記與系列書架；未提供遞迴掃描、作者管理、全文搜尋或雲端同步。詳見 [本輪計畫](next-phase-plan.md)。
 
 ## 取得、執行與檢查
 
@@ -46,7 +48,7 @@ npm run tauri dev
 
 | 檔案 | 職責與接手注意事項 |
 | --- | --- |
-| `src-tauri/src/library.rs` | SQLite schema v2、來源去重、收藏、進度、封面與書庫 IPC。資料庫較新的 schema 會拒絕開啟，不會重設資料。 |
+| `src-tauri/src/library.rs` | SQLite schema v3、來源去重、收藏、進度、封面與書庫 IPC。資料庫較新的 schema 會拒絕開啟，不會重設資料。 |
 | `src-tauri/src/book.rs` | 書籍來源路徑與格式，資料夾及 ZIP／CBZ 頁面來源。 |
 | `src-tauri/src/commands.rs` | 開啟來源、還原進度、session ID、算繪及預載快取隔離。新增書籍切換流程時需保留 session 檢查。 |
 | `src-tauri/src/lib.rs` | 以 Tauri app_data_dir 初始化書庫並註冊指令。 |
@@ -59,7 +61,7 @@ npm run tauri dev
 | `scripts/smoke-library-management.py` | Python Playwright 的 mock IPC 介面 smoke；不測原生檔案視窗。 |
 | `src-tauri/capabilities/default.json` | 主視窗新增 allow-destroy，以便等待進度儲存後關閉。 |
 
-新增依賴只有 Rust `rusqlite`（bundled SQLite），不需另外安裝資料庫；前端教學未新增 npm 依賴。
+新增依賴只有 Rust `rusqlite`（bundled SQLite），不需另外安裝資料庫；前端沿用既有 Phosphor 圖示；第三階段只啟用 rusqlite backup feature，無新增 npm 依賴。
 
 ## 資料、備份與相容性
 
@@ -71,7 +73,7 @@ npm run tauri dev
 - 教學狀態位於 WebView localStorage：`mangafolio.library-guide.v1.hidden`、`mangafolio.library-guide.v1.step`，不在 SQLite。可用「開始教學」重看，不需清空書庫。
 - 未提供可逆 schema 遷移方案。未來改 schema 前，先定義升級與復原流程；回退程式時保留資料備份，不要刪除資料庫來繞過版本檢查。
 
-目前 JSON 備份 v2 與 SQLite schema v2 分別版本化；v1 庫交易升級，v1 備份仍可讀，較新版本拒絕。新增欄位／標籤契約與回滾測試見本輪計畫及驗證。備份最多 16 MiB／10,000 本書，僅包含書庫 metadata；原始漫畫、封面與教學狀態另行保存。匯出使用 create_new，不覆寫既有檔案；還原整批驗證後以 transaction 合併，同路徑不修改，新書籍產生新 ID。移除只刪資料列及自有封面快取，原始漫畫不碰；有缺失 ID 時批次操作回滾。
+目前 JSON 備份 v3 與 SQLite schema v3 分別版本化；v1／v2 庫先安全快照再交易升級，v1／v2 備份仍可讀，較新版本拒絕。新增欄位／標籤契約與回滾測試見本輪計畫及驗證。備份最多 16 MiB／10,000 本書，僅包含書庫 metadata；原始漫畫、封面與教學狀態另行保存。匯出使用 create_new，不覆寫既有檔案；還原整批驗證後以 transaction 合併，同路徑不修改，新書籍產生新 ID。移除只刪資料列及自有封面快取，原始漫畫不碰；有缺失 ID 時批次操作回滾。
 
 移除或重新指定目前載入的書時，介面先 flushProgress，再操作資料層，成功後 discardBook 清除 timer、slot、書籍 ID 與舊閱讀狀態。管理期間阻止其他書庫操作與正常關閉。重新指定來源與封面操作共用 cover_lock，再取得 SQLite connection lock；保留這個鎖順序以避免交叉等待。
 
@@ -104,3 +106,15 @@ npm run tauri dev
 - 外觀 localStorage 不在書庫備份；未知值／損壞使用預設，保存失敗維持可操作。來源可用性仍列庫時計算，10000 本離線本地測試不代表 UNC 來源效能。
 
 最終審查交辦與固定產品提交見 [next-phase-review-assignment.md](next-phase-review-assignment.md)。驗證見 [next-phase-validation.md](next-phase-validation.md)，不要把先前 validation.md 的記錄當成本轮 Windows 驗收。
+
+## 第三階段接手重點
+
+固定基準 e38f7a8；產品 `ad0e366cb0d7c4b583968243f8d864d58fce0d3e`，後續文件提交只固定產品對應。詳見 [第三階段交辦](third-phase-review-assignment.md)、[本次驗證](third-phase-validation.md)、[實際預覽](third-phase-visual-validation.md)。
+
+- 系列優先沿用 series／volume；每本單一系列、單層，不移动來源。書庫與系列搜尋／排序／位置各自保存。下一集僅純數字唯一相鄰，離線與歧義拒絕任意跳轉。
+- `library_reading.rs`：系列交易與書籤；`library_safety.rs`：升級前 SQLite online backup、還原預覽、本機安全備份與保留 manifest。
+- schema／JSON v3，v1／v2 JSON 可讀；未知版本拒絕，既有來源含書籤略過不覆寫；升級前備份涵蓋 WAL，失敗中止。備份不含來源／封面／外觀或本機自動備份設定。
+- `series.ts`、`SeriesShelf.vue`、`BookDetailsPanel.vue`、`BookmarksPanel.vue`、`ReaderActions.vue`、`BackupPanel.vue` 與 backup store 共用原 store／IPC；樣式集中語意 token。書籤 dialog Teleport 到 body，不受隱藏工具列影響。
+- 自動預設關閉，啟動／每 15 分鐘檢查，一天一次，可手動立即；保留 1–20，僅登記且可驗證 JSON 可清理。升級快照／未知檔案永不依自動保留數清理。
+- 本次 npm21／Rust44、build及 browser 回歸通過；Linux Tauri 有隔離畫面／書籤／下一集有限實測。Windows、實體觸控／IME、完整原生檔案視窗仍未驗收。所有測試來源／DB在臨時隔離路徑。
+- 正確視覺參考是使用者 `01_56_49`／`01_56_58`／`01_57_03` 三張內嵌圖，已直接檢視；雲端取不到原始 PNG 位元組，正式 references 歸檔待可下載原附件，不引用舊圖。

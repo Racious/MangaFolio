@@ -1,0 +1,44 @@
+{
+  "productSha": "ad0e366cb0d7c4b583968243f8d864d58fce0d3e",
+  "boundary": "Linux debug Tauri + live current Vite / real isolated SQLite and image decode; not Windows acceptance",
+  "isolatedRoot": "/tmp/mangafolio-third-phase-native",
+  "schema": 3,
+  "books": 28,
+  "progress": [
+    {
+      "id": 3,
+      "lastIndex": 119,
+      "pageName": "120.png"
+    },
+    {
+      "id": 4,
+      "lastIndex": 0,
+      "pageName": "001.png"
+    }
+  ],
+  "bookmarks": [
+    {
+      "bookId": 3,
+      "pageName": "082.png",
+      "pageIndex": 81,
+      "name": "港口",
+      "note": "原生隔離書籤"
+    },
+    {
+      "bookId": 3,
+      "pageName": "082.png",
+      "pageIndex": 81,
+      "name": "Native ma",
+      "note": "rk<b>plain text n"
+    }
+  ],
+  "backup": {
+    "enabled": 0,
+    "retention": 5,
+    "lastSuccess": 1791051120361,
+    "lastError": ""
+  },
+  "backups": [
+    "mangafolio-auto-1791051120359-52730-0.json"
+  ]
+}

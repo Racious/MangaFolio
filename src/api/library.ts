@@ -93,3 +93,50 @@ export const renameTag = (id: number, name: string) =>
 export const deleteTag = (id: number) => invoke<void>("delete_tag", { id });
 export const assignTag = (ids: number[], tagId: number, add: boolean) =>
   invoke<void>("assign_book_tag", { ids, tagId, add });
+
+export interface Bookmark {
+  id: number;
+  bookId: number;
+  pageName: string;
+  pageIndex: number;
+  name: string;
+  note: string;
+}
+export interface BackupSettings {
+  enabled: boolean;
+  retention: number;
+  lastSuccess: number | null;
+  lastError: string;
+  customDirectory: string | null;
+  directory: string;
+  directoryWarning: string;
+}
+export interface RestorePreview {
+  added: number;
+  skipped: number;
+  conflicts: number;
+  unsupported: number;
+  issues: string[];
+  canRestore: boolean;
+  version: number | null;
+}
+export const assignSeries = (ids: number[], name: string) =>
+  invoke<void>("assign_book_series", { ids, name });
+export const listBookmarks = (bookId: number) =>
+  invoke<Bookmark[]>("list_bookmarks", { bookId });
+export const saveBookmark = (bookmark: Bookmark) =>
+  invoke<Bookmark>("save_bookmark", { bookmark });
+export const deleteBookmark = (id: number, bookId: number) =>
+  invoke<void>("delete_bookmark", { id, bookId });
+export const previewBackup = (path: string) =>
+  invoke<RestorePreview>("preview_library_backup", { path });
+export const getBackupSettings = () =>
+  invoke<BackupSettings>("get_backup_settings");
+export const getBackupDirectory = () => invoke<string>("get_backup_directory");
+export const openBackupDirectory = () => invoke<void>("open_backup_directory");
+export const setBackupDirectory = (path: string | null) =>
+  invoke<BackupSettings>("set_backup_directory", { path });
+export const setBackupSettings = (enabled: boolean, retention: number) =>
+  invoke<BackupSettings>("set_backup_settings", { enabled, retention });
+export const runAutomaticBackup = (force = false) =>
+  invoke<BackupSettings>("run_automatic_backup", { force });

@@ -4,15 +4,23 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import LibraryView from "./components/LibraryView.vue";
 import Toolbar from "./components/Toolbar.vue";
 import ImmersiveReader from "./components/ImmersiveReader.vue";
+import ReaderActions from "./components/ReaderActions.vue";
 import ReaderView from "./components/ReaderView.vue";
 import PageScrubber from "./components/PageScrubber.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
 import { useLibraryStore } from "./stores/library";
 import { useReaderStore } from "./stores/reader";
 import { useAppearanceStore } from "./stores/appearance";
+import { useBackupStore } from "./stores/backup";
 import { useUpdateStore } from "./stores/update";
 
 const library = useLibraryStore();
+const backup = useBackupStore();
+let backupTimer: ReturnType<typeof setInterval> | undefined;
+function maintainBackup() {
+  if (!library.managing && !library.importing && !reader.loading)
+    void backup.maintain();
+}
 const reader = useReaderStore();
 const update = useUpdateStore();
 const appearance = useAppearanceStore();
@@ -57,13 +65,17 @@ function retrySave() {
 }
 onMounted(async () => {
   void library.refresh();
+  maintainBackup();
+  backupTimer = setInterval(maintainBackup, 15 * 60 * 1000);
   void update.checkForUpdates({ silent: true });
   try {
     const window = getCurrentWindow();
     const unlisten = await window.onCloseRequested(async (event) => {
       event.preventDefault();
-      if (library.managing || library.importing) {
-        library.error = "書庫操作進行中，請完成後再關閉視窗。";
+      if (library.managing || library.importing || backup.pending || reader.loading) {
+        const message = "書庫或閱讀操作進行中，請完成後再關閉視窗。";
+        if (library.screen === "reader") reader.progressError = message;
+        else library.error = message;
         return;
       }
       if (closing) return;
@@ -84,6 +96,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   disposed = true;
+  if (backupTimer) clearInterval(backupTimer);
   systemTheme.removeEventListener("change", applyAppearance);
   unlistenClose?.();
 });
@@ -94,7 +107,9 @@ onUnmounted(() => {
     <LibraryView v-if="library.screen === 'library'" />
     <ImmersiveReader v-else :key="reader.bookId ?? 'empty'">
       <ReaderView />
-      <template #top><Toolbar @library="returnToLibrary" /></template>
+      <template #top
+        ><Toolbar @library="returnToLibrary" /><ReaderActions
+      /></template>
       <template #bottom>
         <PageScrubber />
         <p v-if="reader.hasBook" class="save-status" role="status">

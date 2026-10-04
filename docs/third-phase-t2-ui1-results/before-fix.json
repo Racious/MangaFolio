@@ -1,0 +1,5 @@
+{
+  "firstRetryProbeExitCode": 1,
+  "fullRecoveryProbeExitCode": 1,
+  "expected": "actual panel retains first error after successful scheduled recovery while store errors are empty"
+}

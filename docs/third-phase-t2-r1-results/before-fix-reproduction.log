@@ -1,0 +1,22 @@
+   Compiling manga-reader v0.1.4 (/workspace/MangaFolio-management-ui/src-tauri)
+    Finished `test` profile [optimized + debuginfo] target(s) in 18.45s
+     Running unittests src/lib.rs (/workspace/MangaFolio/src-tauri/target/debug/deps/manga_reader_lib-95a6af62603a2994)
+
+running 1 test
+test library::reading::tests::consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup ... FAILED
+
+failures:
+
+---- library::reading::tests::consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup stdout ----
+
+thread 'library::reading::tests::consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup' (65110) panicked at src/library_reading.rs:433:13:
+recovered but stale error remains: 備份狀態恢復／清理失敗；未清理檔案保留，下次檢查會重試：書庫資料操作失敗：cleanup failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    library::reading::tests::consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`

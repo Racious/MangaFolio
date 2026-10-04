@@ -1,0 +1,10 @@
+{
+  "src-tauri/src/library.rs": "ee24762abf84cd04a360677ad574c3b8c909a3f708acd71f3b549f6311d860cc",
+  "src-tauri/src/library_safety.rs": "8f4092dd368924b00bf4ddde150f6c78db181127ac13d3ff18bacd82dce6e04c",
+  "src-tauri/src/library_reading.rs": "8d0bf8d6453e100e73fc91ff3c248bc9c9f78c8bedcbd649118290b33a860c24",
+  "src/components/LibraryView.vue": "c44d6654d70074b31b7139be87eaa7cfc7ebfe5768ad946f1c7e7efbd67e7415",
+  "src/components/SeriesShelf.vue": "5aaaec44eafadfc45bfbf1015ba16e2b174254d443f926f956f5fb9b0d88cf90",
+  "src/stores/library.ts": "f6b17d8c4ebb15d385c07cfc717ab3b99952d8f93978c88d2907c654ce3b61d1",
+  "scripts/validate-third-phase.py": "d77d3d15375436d50bb0b820d64ad431c341a5375908af3f567b8bd52de85274",
+  "scripts/validate-third-phase-review-fixes.py": "c69417c5a963674b037ade393a9d60d38a4ee1a6766e638e339cee7c810beae5"
+}

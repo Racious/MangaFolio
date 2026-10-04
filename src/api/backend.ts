@@ -37,6 +37,8 @@ export function openLibraryBook(id: number): Promise<BookInfo> {
   return invoke<BookInfo>("open_library_book", { id });
 }
 
+export const openBookmark = (bookId:number,id:number) => invoke<BookInfo>("open_bookmark", {bookId,id});
+
 /**
  * 請後端依縮放模式以 Lanczos3 處理指定頁面，回傳可供 <img> 使用的物件 URL。
  * 後端統一輸出 PNG。

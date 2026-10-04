@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/MangaFolio-management-ui/scripts/validate-next-phase.py", line 243, in <module>
+    assert not errors,errors
+           ^^^^^^^^^^
+AssertionError: ["Cannot read properties of null (reading 'length')"]

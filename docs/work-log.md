@@ -78,3 +78,26 @@
 隔離瀏覽器及 Linux Tauri 有實際截图，驗證輸出另存 `docs/next-phase-results/visual-refinement`，不覆蓋歷史證據。本次先提供 [完整畫面](ui-refinement-preview.md) 給使用者看，修改保留工作區，未產生本次提交。Windows 原生及實體觸控尚未驗收。
 
 使用者後續授權將目前功能分支合併主線，要求保留 merge commit；先提交介面精修及隔離驗證證據，再以 `--no-ff` 合併。Windows 本次原生驗收仍未執行，合併不代表發布版本。
+
+
+## 2026-10-04｜第三階段系列、書籤與安全備份
+
+基準 e38f7a84c33126e11a141d10c0f38f4defb8985f，從已保留 merge 的最新主線建立 feature/series-library-reading；前階段 UI 精修 e2a87d6 已在基準。起始 workspace 乾淨，原工作區／提交保留，未找到適用 AGENTS.md。
+
+使用者訂正參考圖片，已直接讀取對話正確三張，不引用舊圖。先記錄配套設計及 v3 契約，再完成系列／詳情、保守下一集、書籤純文字筆記、WAL 一致性升級快照、自動備份／唯讀還原預覽，以及三風格共用介面。
+
+整合期間修正書籤 dialog 受隱藏工具列影響（Teleport）及關閉 dialog 阻擋 Esc／方向鍵；新增回歸。保存完整嘗試輸出與最終 npm21／Rust44、build、三組 browser 測試。大型書庫 10,000 本聚合／初始 60 個系列封面量測；另補切集 in-flight 關閉視窗保護與成功備份後清理失敗的精確回報。修正共用封面在來源重新上線後的更新與過期非同步結果保護，並以保留的詳情元件測試。有限 Linux Tauri 實際滿高閱讀、詳情、書籤寫入與下一集證據。
+
+第三階段未合併 main／未發版，Windows 等未驗項與原 PNG 歸檔外部限制明列於第三階段驗證／交辦；產品 ad0e366cb0d7c4b583968243f8d864d58fce0d3e，後續文件提交固定對應。
+
+## 2026-10-04 第三階段 T1／T2／T3 修正
+
+接手基準 421d2acea22fccb7f2822848c80ac5a2a265270e，工作區乾淨，保留兩份原報告。修正 Windows 快照 sync handle、DDL 假通過防護、自動 JSON 登記／成功時間／重啟重試、已刪檔 manifest 清理，以及 >60 本／系列與窄視窗返回位置。產品 45568a804b1228c9016f9a7fd2bd876218673b2e；無 schema 遷移、無用戶資料操作、無主線合併或發布。Linux npm21／Rust46、build、diff check、四支 browser script 通過，完整輸出与待 Windows 複驗見 third-phase-review-fix-validation.md／handoff.md。
+
+## 2026-10-04 T2-R1 連續恢復失敗補強
+
+接手 52e30f5865a0596514f5fa9e03187c3f1e28a3cf；工作區乾淨、保留三份原第三階段審查。先以新回歸在原產品重現過期錯誤（exit101），再補恢復／清理成功的錯誤清除條件，共用現有階段文案常數。新增停用與 24h gate 內連續失敗恢復，以及未恢復建立錯誤不得清除的兩項測試。產品 0b883c85e77ea8046fa851464c80a86fbbb7c513；Linux48／npm21、build／diff 通過，完整輸出與待 Windows 項目見 third-phase-t2-r1-handoff.md。未碰使用者 DB，無 schema／新功能、無主線合併或發布。
+
+## 2026-10-04 T2-UI1 面板錯誤單一來源
+
+接手 1d62ec7f5203e32a533ff926d89c1cf3fb16820b，工作區乾淨。原四份報告保留；新報告確認 T2-R1 後端結案，面板錯誤另留副本。真實 Vue／Pinia／App 排程重現成功恢復仍 alert（預期 exit1）；僅修 BackupPanel automatic() 不重複 throw store 的錯誤，成功通知加空錯誤條件。八項新元件回歸、既有書庫／第三階段整合、Linux48／npm21／build／diff 通過。產品 b1a02dd65d80cb85c6b633ce65d197ac8ca4fb3f；完整輸出與未執行項目見 third-phase-t2-ui1-handoff.md。無用戶 DB、schema、主線合併或發布。

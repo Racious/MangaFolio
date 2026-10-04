@@ -1,0 +1,40 @@
+{
+  "mode": "browser mock IPC / actual Vue DOM; not native Windows",
+  "checks": [
+    {
+      "case": "desktop-expanded-book-80",
+      "visibleBooks": 120,
+      "before": 15993,
+      "after": 15993,
+      "anchorOffset": 19.65625
+    },
+    {
+      "case": "narrow-outer-scroller-book-80",
+      "visibleBooks": 120,
+      "before": 24170,
+      "after": 24170,
+      "anchorOffset": 20.03125
+    },
+    {
+      "case": "resize-narrow-to-desktop-preserves-anchor",
+      "anchor": {
+        "key": "book:77",
+        "offset": -574.859375
+      }
+    },
+    {
+      "case": "series-detail-volume-80",
+      "visibleBooks": 120,
+      "before": 15607,
+      "after": 15607,
+      "anchorOffset": 20.4375
+    },
+    {
+      "case": "expanded-series-80-detail-reader-return",
+      "visibleSeries": 120,
+      "before": 13636,
+      "after": 13636
+    }
+  ],
+  "pageErrors": []
+}

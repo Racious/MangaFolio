@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { filterBooks, sortBooks } from "../src/lib/library.ts";
+import { filterBooks, sortBooks, displayPath } from "../src/lib/library.ts";
 import type { LibraryBook } from "../src/api/library.ts";
 
 function book(
@@ -144,4 +144,10 @@ test("large library filtering and sorting keep a stable source array", () => {
   assert.equal(books[0].id, 1);
   assert.equal(books.at(-1)?.id, 10000);
   assert.equal(sortBooks(books, "title")[9].id, 10);
+});
+
+test("Windows verbatim paths are simplified only for display", () => {
+  assert.equal(displayPath("\\\\?\\C:\\books\\書.zip"), "C:\\books\\書.zip");
+  assert.equal(displayPath("路徑不存在：\\\\?\\UNC\\server\\share\\書.zip"), "路徑不存在：\\\\server\\share\\書.zip");
+  assert.equal(displayPath("/books/book.zip"), "/books/book.zip");
 });

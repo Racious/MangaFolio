@@ -1,0 +1,7 @@
+{
+  "third-review-fix-rust-first.log": 0,
+  "third-fix-build-first.log": 0,
+  "third-fix-browser-first.log": 1,
+  "third-fix-browser-second.log": 0,
+  "cargo-test-moved-name.log": 101
+}

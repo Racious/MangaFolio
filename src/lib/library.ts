@@ -60,3 +60,7 @@ export function sortBooks(
     );
   return sorted;
 }
+/** Keep Windows verbatim paths for IPC/storage; simplify only user-facing text. */
+export function displayPath(value: string): string {
+  return value.split("\\\\?\\UNC\\").join("\\\\").split("\\\\?\\").join("");
+}

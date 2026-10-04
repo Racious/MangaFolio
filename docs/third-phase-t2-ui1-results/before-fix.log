@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/MangaFolio-management-ui/scripts/validate-backup-panel-recovery.py", line 93, in <module>
+    assert alerts.count()==0, state()
+           ^^^^^^^^^^^^^^^^^
+AssertionError: {'pending': False, 'error': '', 'lastError': '', 'lastSuccess': 1700000000000, 'panelAlert': 'Error: 備份已建立，但保留清理失敗；下次檢查會重試：cleanup failed', 'notice': ''}

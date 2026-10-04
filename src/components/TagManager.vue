@@ -39,7 +39,7 @@ async function run(kind: "create" | "rename" | "delete") {
     await library.refresh();
     name.value = "";
     if (!library.tags.some((t) => t.id === tagId.value)) tagId.value = null;
-    library.importNotice = "標籤操作已完成。";
+    library.notifySuccess("標籤操作已完成。");
   } catch (e) {
     library.error = String(e);
   } finally {

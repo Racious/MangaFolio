@@ -1,0 +1,140 @@
+
+> manga-reader@0.1.4 test
+> node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs
+
+TAP version 13
+# Subtest: appearance restores known settings and tolerates missing or corrupt storage
+ok 1 - appearance restores known settings and tolerates missing or corrupt storage
+  ---
+  duration_ms: 1.610162
+  type: 'test'
+  ...
+# Subtest: styles are independent from view and theme and old preferences gain default style
+ok 2 - styles are independent from view and theme and old preferences gain default style
+  ---
+  duration_ms: 0.192253
+  type: 'test'
+  ...
+# Subtest: reader toolbar pin defaults off and validates persisted boolean independently
+ok 3 - reader toolbar pin defaults off and validates persisted boolean independently
+  ---
+  duration_ms: 0.112475
+  type: 'test'
+  ...
+# Subtest: cover queue bounds concurrent decoding and skips canceled offscreen jobs
+ok 4 - cover queue bounds concurrent decoding and skips canceled offscreen jobs
+  ---
+  duration_ms: 51.894694
+  type: 'test'
+  ...
+# Subtest: switching volume waits for save and preserves current book when save/open fails
+ok 5 - switching volume waits for save and preserves current book when save/open fails
+  ---
+  duration_ms: 4.88015
+  type: 'test'
+  ...
+# Subtest: card favorite and unfavorite synchronize retained reader and its next toggle
+ok 6 - card favorite and unfavorite synchronize retained reader and its next toggle
+  ---
+  duration_ms: 1.532047
+  type: 'test'
+  ...
+# Subtest: failed favorite leaves both states unchanged
+ok 7 - failed favorite leaves both states unchanged
+  ---
+  duration_ms: 0.811917
+  type: 'test'
+  ...
+# Subtest: switching books while favorite is pending never updates the new reader
+ok 8 - switching books while favorite is pending never updates the new reader
+  ---
+  duration_ms: 0.737476
+  type: 'test'
+  ...
+# Subtest: store import prevents duplicate starts and honors cancellation and management lock
+ok 9 - store import prevents duplicate starts and honors cancellation and management lock
+  ---
+  duration_ms: 4.919639
+  type: 'test'
+  ...
+# Subtest: reader final spreads retain the start index in progress snapshots
+ok 10 - reader final spreads retain the start index in progress snapshots
+  ---
+  duration_ms: 8.990587
+  type: 'test'
+  ...
+# Subtest: batch import records added, updated, failed and conflicts and continues
+ok 11 - batch import records added, updated, failed and conflicts and continues
+  ---
+  duration_ms: 2.197818
+  type: 'test'
+  ...
+# Subtest: cancel preserves the in-flight successful item and never starts remaining sources
+ok 12 - cancel preserves the in-flight successful item and never starts remaining sources
+  ---
+  duration_ms: 0.254765
+  type: 'test'
+  ...
+# Subtest: search handles Chinese names, width normalization, case and surrounding spaces
+ok 13 - search handles Chinese names, width normalization, case and surrounding spaces
+  ---
+  duration_ms: 1.374485
+  type: 'test'
+  ...
+# Subtest: favorite and recent filters combine with search and distinguish unread from page one
+ok 14 - favorite and recent filters combine with search and distinguish unread from page one
+  ---
+  duration_ms: 0.236248
+  type: 'test'
+  ...
+# Subtest: natural title sorting and recent sorting do not mutate stored library order
+ok 15 - natural title sorting and recent sorting do not mutate stored library order
+  ---
+  duration_ms: 6.152055
+  type: 'test'
+  ...
+# Subtest: full-width b searches titles without matching archive path extensions
+ok 16 - full-width b searches titles without matching archive path extensions
+  ---
+  duration_ms: 0.254064
+  type: 'test'
+  ...
+# Subtest: status, missing-source, favorites, tags and metadata search compose without resetting
+ok 17 - status, missing-source, favorites, tags and metadata search compose without resetting
+  ---
+  duration_ms: 0.316576
+  type: 'test'
+  ...
+# Subtest: large library filtering and sorting keep a stable source array
+ok 18 - large library filtering and sorting keep a stable source array
+  ---
+  duration_ms: 85.14124
+  type: 'test'
+  ...
+# Subtest: series aggregate separates manual read count and page percentage; resume uses available recent unread state
+ok 19 - series aggregate separates manual read count and page percentage; resume uses available recent unread state
+  ---
+  duration_ms: 1.305975
+  type: 'test'
+  ...
+# Subtest: volume ordering is natural; ambiguous/missing/special/duplicate/gaps never choose arbitrary next
+ok 20 - volume ordering is natural; ambiguous/missing/special/duplicate/gaps never choose arbitrary next
+  ---
+  duration_ms: 7.355778
+  type: 'test'
+  ...
+# Subtest: bookmark page-name localization follows insertions and refuses missing pages
+ok 21 - bookmark page-name localization follows insertions and refuses missing pages
+  ---
+  duration_ms: 0.347091
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 617.239055

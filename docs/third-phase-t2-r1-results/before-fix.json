@@ -1,0 +1,5 @@
+{
+  "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml consecutive_cleanup_failures_clear_error_after_recovery_without_new_backup",
+  "exitCode": 101,
+  "expected": "test fails with stale recovery error on unmodified product"
+}

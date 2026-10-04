@@ -1,0 +1,77 @@
+{
+  "productSha": "ad0e366cb0d7c4b583968243f8d864d58fce0d3e",
+  "baseline": "e38f7a84c33126e11a141d10c0f38f4defb8985f",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "seconds": 0.786,
+      "output": "docs/third-phase-results/npm-test.log",
+      "utc": "2026-10-03T18:06:36.330661+00:00"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 6.2,
+      "output": "docs/third-phase-results/npm-build.log",
+      "utc": "2026-10-03T18:06:42.531720+00:00"
+    },
+    {
+      "command": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+      "exitCode": 0,
+      "seconds": 0.912,
+      "output": "docs/third-phase-results/cargo-test.log",
+      "utc": "2026-10-03T18:06:43.444033+00:00"
+    },
+    {
+      "command": "cargo build --locked --manifest-path src-tauri/Cargo.toml",
+      "exitCode": 0,
+      "seconds": 0.293,
+      "output": "docs/third-phase-results/native-build.log",
+      "utc": "2026-10-03T18:06:43.736963+00:00"
+    },
+    {
+      "command": "python scripts/validate-third-phase.py",
+      "exitCode": 0,
+      "seconds": 12.348,
+      "output": "docs/third-phase-results/browser-third-phase.log",
+      "utc": "2026-10-03T18:06:56.085748+00:00"
+    },
+    {
+      "command": "python scripts/validate-next-phase.py",
+      "exitCode": 0,
+      "seconds": 6.063,
+      "output": "docs/third-phase-results/browser-regression.log",
+      "utc": "2026-10-03T18:07:02.149303+00:00"
+    },
+    {
+      "command": "python scripts/validate-immersive-reader.py",
+      "exitCode": 0,
+      "seconds": 4.895,
+      "output": "docs/third-phase-results/reader-regression.log",
+      "utc": "2026-10-03T18:07:07.044981+00:00"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "seconds": 0.008,
+      "output": "docs/third-phase-results/git-diff-check.log",
+      "utc": "2026-10-03T18:07:07.052993+00:00"
+    },
+    {
+      "command": "python scripts/validate-third-phase-native-artifacts.py",
+      "exitCode": 0,
+      "output": "docs/third-phase-results/native-artifacts.log"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "output": "docs/third-phase-results/git-diff-check.log"
+    },
+    {
+      "command": "git diff --cached --check",
+      "exitCode": 0,
+      "output": "docs/third-phase-results/git-staged-diff-check.log"
+    }
+  ]
+}

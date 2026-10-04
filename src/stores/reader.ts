@@ -1,9 +1,12 @@
 // 閱讀器狀態：當前書、頁碼、閱讀方向、單／雙頁、縮放模式、翻頁特效、封面配對。
 
 import { defineStore } from "pinia";
+import { useLibraryStore } from "./library";
+import { displayPath } from "../lib/library";
 import {
   openPath,
   openLibraryBook,
+  openBookmark,
   renderPageUrl,
   type BookInfo,
   type FitMode,
@@ -77,6 +80,7 @@ export const useReaderStore = defineStore("reader", {
     slots: [] as ViewSlot[],
     loading: false,
     error: "",
+    missingBookId: null as number | null,
     renderToken: 0,
     transition: "book" as Transition,
     /** 翻頁方向：1 = 往後，-1 = 往前。供特效決定方位。 */
@@ -119,6 +123,7 @@ export const useReaderStore = defineStore("reader", {
       this.favorite = false;
       this.error = "";
       this.progressError = "";
+      this.missingBookId = null;
     },
     /** 頁碼 → 所屬跨頁起始頁碼。 */
     pairStart(index: number): number {
@@ -155,16 +160,21 @@ export const useReaderStore = defineStore("reader", {
       return this.loadBook(() => openPath(path));
     },
 
+    async openBookmark(bookId:number,id:number) { return this.loadBook(()=>openBookmark(bookId,id), bookId); },
+
     async openBook(id: number) {
-      return this.loadBook(() => openLibraryBook(id));
+      return this.loadBook(() => openLibraryBook(id), id);
     },
 
-    async loadBook(load: () => Promise<BookInfo>) {
+    async loadBook(load: () => Promise<BookInfo>, requestedId?: number) {
       if (this.loading) return false;
       this.loading = true;
       this.error = "";
+      this.missingBookId = null;
+      let sourceAttempted = false;
       try {
         await this.flushProgress();
+        sourceAttempted = true;
         const info = await load();
         this.renderToken++;
         this.clearSlots();
@@ -179,7 +189,16 @@ export const useReaderStore = defineStore("reader", {
         this.scheduleProgress();
         return true;
       } catch (e) {
-        this.error = String(e);
+        const message = displayPath(String(e));
+        this.error = message;
+        if (sourceAttempted && requestedId !== undefined) {
+          const library = useLibraryStore();
+          await library.refresh();
+          if (this.error === message && library.books.find(book => book.id === requestedId)?.available === false) {
+            this.missingBookId = requestedId;
+            this.error += "。請前往「來源失效」，進入管理並選取這本書，重新指定同一本漫畫來源。";
+          }
+        }
         return false;
       } finally {
         this.loading = false;
@@ -239,6 +258,7 @@ export const useReaderStore = defineStore("reader", {
         if (this.bookId === id) this.favorite = favorite;
       } catch (e) {
         this.error = String(e);
+        this.missingBookId = null;
       } finally {
         this.favoritePending = false;
       }
@@ -256,6 +276,7 @@ export const useReaderStore = defineStore("reader", {
 
       const token = ++this.renderToken;
       this.error = "";
+      this.missingBookId = null;
       try {
         const urls = await Promise.all(
           indices.map((i) =>
@@ -282,7 +303,10 @@ export const useReaderStore = defineStore("reader", {
         this.slots = this.direction === "rtl" ? next.reverse() : next;
         this.viewSeq++;
       } catch (e) {
-        if (token === this.renderToken) this.error = String(e);
+        if (token === this.renderToken) {
+          this.error = String(e);
+          this.missingBookId = null;
+        }
       }
     },
 

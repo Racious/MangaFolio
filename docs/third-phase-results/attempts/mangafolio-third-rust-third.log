@@ -1,0 +1,21 @@
+   Compiling manga-reader v0.1.4 (/workspace/MangaFolio-management-ui/src-tauri)
+error[E0599]: no method named `set_favorite` found for struct `library::Library` in the current scope
+   --> src/library_reading.rs:264:11
+    |
+264 |         l.set_favorite(b.id, true).unwrap();
+    |           ^^^^^^^^^^^^
+    |
+   ::: src/library.rs:24:1
+    |
+ 24 | pub struct Library {
+    | ------------------ method `set_favorite` not found for this struct
+    |
+help: there is a method `favorite` with a similar name
+    |
+264 -         l.set_favorite(b.id, true).unwrap();
+264 +         l.favorite(b.id, true).unwrap();
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `manga-reader` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -5,8 +5,8 @@ from pathlib import Path
 import json, os
 from playwright.sync_api import sync_playwright
 root = Path(__file__).resolve().parents[1]
-out = root/'docs/next-phase-results/visual-refinement'
-images = root/'docs/images/next-phase/refinement-after'
+out = root/os.environ.get('MANGAFOLIO_READER_RESULT_DIR','docs/next-phase-results/visual-refinement')
+images = root/os.environ.get('MANGAFOLIO_READER_IMAGE_DIR','docs/images/next-phase/refinement-after')
 out.mkdir(parents=True, exist_ok=True)
 images.mkdir(parents=True, exist_ok=True)
 # Reuse the library fixture setup, without executing its integration run.
@@ -65,6 +65,8 @@ with sync_playwright() as p:
  page.get_by_role('button',name='← 書庫',exact=True).focus();page.wait_for_timeout(220)
  assert opacity('top')=='1'
  checks.append('Escape toggles both bars; keyboard focus reveals hidden controls; IME and input focus do not toggle')
+ page.locator('body').click(position={'x':720,'y':500});page.evaluate('window.readerTest.index=0');page.keyboard.press('ArrowRight');page.wait_for_function('window.readerTest.index===1')
+ checks.append('closed bookmark dialog does not block reader ArrowRight navigation')
  page.locator('body').click(position={'x':720,'y':500})
  page.evaluate("window.readerTest.progressError='隔離測試：進度儲存失敗'")
  assert page.get_by_role('alert').is_visible()

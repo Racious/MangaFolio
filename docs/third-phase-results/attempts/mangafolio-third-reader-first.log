@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/MangaFolio-management-ui/scripts/validate-immersive-reader.py", line 57, in <module>
+    assert opacity('top')=='1' and opacity('bottom')=='1'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

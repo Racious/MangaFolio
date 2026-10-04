@@ -1,0 +1,20 @@
+dbus-daemon[46008]: [session uid=1000 pid=46008 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.0' (uid=1000 pid=46011 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[46008]: [session uid=1000 pid=46008 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[46025]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=46011 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[46025]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[46179]: [session uid=1000 pid=46179 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.0' (uid=1000 pid=46180 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[46179]: [session uid=1000 pid=46179 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[46190]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=46180 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[46190]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[51470]: [session uid=1000 pid=51470 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.0' (uid=1000 pid=51475 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[51470]: [session uid=1000 pid=51470 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[51489]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=51475 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[51489]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[52727]: [session uid=1000 pid=52727 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.0' (uid=1000 pid=52730 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[52727]: [session uid=1000 pid=52727 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[52744]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=52730 comm="/workspace/MangaFolio/src-tauri/target/debug/manga" label="kernel")
+dbus-daemon[52744]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry

@@ -1,7 +1,57 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 
-const pinned = ref(false);
+import { useAppearanceStore } from "../stores/appearance";
+const appearance = useAppearanceStore();
+const pinned = ref(appearance.settings.readerPinned);
+const REVEAL_DISTANCE = 80;
+const HIDE_DELAY = 400;
+type Edge = "top" | "bottom";
+const revealed = ref({ top: false, bottom: false });
+const hovered = { top: false, bottom: false };
+const hideTimers: Partial<Record<Edge, ReturnType<typeof setTimeout>>> = {};
+function cancelHide(edge: Edge) {
+  clearTimeout(hideTimers[edge]);
+  delete hideTimers[edge];
+}
+function reveal(edge: Edge) {
+  cancelHide(edge);
+  revealed.value[edge] = true;
+}
+function deferHide(edge: Edge) {
+  if (hovered[edge] || !revealed.value[edge] || hideTimers[edge] !== undefined) return;
+  hideTimers[edge] = setTimeout(() => {
+    revealed.value[edge] = false;
+    delete hideTimers[edge];
+  }, HIDE_DELAY);
+}
+function onPointerMove(event: PointerEvent) {
+  if (event.pointerType === "touch") return;
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  for (const edge of ["top", "bottom"] as const) {
+    const distance = edge === "top" ? event.clientY - bounds.top : bounds.bottom - event.clientY;
+    if (distance >= 0 && distance <= REVEAL_DISTANCE) reveal(edge);
+    else deferHide(edge);
+  }
+}
+function chromeEnter(edge: Edge) {
+  hovered[edge] = true;
+  reveal(edge);
+}
+function chromeLeave(edge: Edge) {
+  hovered[edge] = false;
+  deferHide(edge);
+}
+function readerLeave() {
+  chromeLeave("top");
+  chromeLeave("bottom");
+}
+watch(
+  () => appearance.settings.readerPinned,
+  (value) => {
+    pinned.value = value;
+  },
+);
 function onKey(event: KeyboardEvent) {
   if (
     event.key !== "Escape" ||
@@ -12,7 +62,7 @@ function onKey(event: KeyboardEvent) {
   )
     return;
   if (
-    document.querySelector("[role='dialog']") ||
+    document.querySelector("dialog[open], [role='dialog']:not(dialog)") ||
     (event.target instanceof Element &&
       event.target.closest("input, textarea, select, [contenteditable]"))
   )
@@ -20,17 +70,22 @@ function onKey(event: KeyboardEvent) {
   pinned.value = !pinned.value;
 }
 onMounted(() => window.addEventListener("keydown", onKey));
-onUnmounted(() => window.removeEventListener("keydown", onKey));
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKey);
+  cancelHide("top");
+  cancelHide("bottom");
+});
 </script>
 
 <template>
-  <section class="immersive-reader" :class="{ pinned }" aria-label="閱讀區域">
+  <section class="immersive-reader" :class="{ pinned }" aria-label="閱讀區域"
+    @pointermove="onPointerMove" @pointerleave="readerLeave">
     <slot />
-    <div class="reader-edge top" aria-label="上方閱讀工具列">
-      <div class="reader-chrome"><slot name="top" /></div>
+    <div class="reader-edge top" :class="{ revealed: revealed.top }" aria-label="上方閱讀工具列">
+      <div class="reader-chrome" @pointerenter="chromeEnter('top')" @pointerleave="chromeLeave('top')"><slot name="top" /></div>
     </div>
-    <div class="reader-edge bottom" aria-label="下方閱讀工具列">
-      <div class="reader-chrome"><slot name="bottom" /></div>
+    <div class="reader-edge bottom" :class="{ revealed: revealed.bottom }" aria-label="下方閱讀工具列">
+      <div class="reader-chrome" @pointerenter="chromeEnter('bottom')" @pointerleave="chromeLeave('bottom')"><slot name="bottom" /></div>
     </div>
     <button
       class="touch-controls"
@@ -58,6 +113,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
   right: 0;
   z-index: 40;
   height: 24px;
+  pointer-events: none;
 }
 .top {
   top: 0;
@@ -83,7 +139,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
   bottom: 0;
   transform: translateY(100%);
 }
-.reader-edge:hover .reader-chrome,
+.reader-edge.revealed .reader-chrome,
 .reader-edge:focus-within .reader-chrome,
 .pinned .reader-chrome {
   position: absolute;

@@ -13,10 +13,24 @@ import {
 import { importSources, type ImportProgress } from "../lib/import";
 import { filterBooks, type LibraryFilter } from "../lib/library";
 export type { LibraryFilter } from "../lib/library";
+const noticeTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
 export const useLibraryStore = defineStore("library", {
   state: () => ({
     books: [] as LibraryBook[],
     query: "",
+    section: "books" as "books" | "series",
+    activeSeries: null as string | null,
+    seriesQuery: "",
+    sort: "recent" as "recent" | "title" | "series",
+    seriesSort: "series" as "recent" | "title" | "series",
+    selectedIds: [] as number[],
+    bookLimit: 60,
+    seriesBookLimit: 60,
+    seriesLimit: 60,
+    scrollAnchor: null as { key: string; offset: number } | null,
+    seriesScrollAnchor: null as { key: string; offset: number } | null,
+    scrollTop: 0,
+    seriesScrollTop: 0,
     tags: [] as Tag[],
     statusFilter: "all" as ReadingStatus | "all",
     tagFilter: null as number | null,
@@ -60,6 +74,18 @@ export const useLibraryStore = defineStore("library", {
       state.books.filter((book) => book.lastReadAt !== null).length,
   },
   actions: {
+    notifySuccess(message: string) {
+      clearTimeout(noticeTimers.get(this));
+      this.importNotice = message;
+      noticeTimers.set(this, setTimeout(() => {
+        if (this.importNotice === message) this.importNotice = "";
+        noticeTimers.delete(this);
+      }, 5000));
+    },
+    async setFilter(filter: LibraryFilter) {
+      this.filter = filter;
+      if (filter === "missing") await this.refresh();
+    },
     async refresh() {
       this.loading = true;
       this.error = "";
@@ -116,7 +142,10 @@ export const useLibraryStore = defineStore("library", {
         });
         await this.refresh();
         const results = this.importProgress.results;
-        this.importNotice = `新增 ${results.filter((r) => r.kind === "added").length} 本，更新 ${results.filter((r) => r.kind === "updated").length} 本，失敗／衝突 ${results.filter((r) => r.kind === "failed" || r.kind === "conflict").length} 本，取消 ${results.filter((r) => r.kind === "canceled").length} 本。`;
+        const message = `新增 ${results.filter((r) => r.kind === "added").length} 本，更新 ${results.filter((r) => r.kind === "updated").length} 本，失敗／衝突 ${results.filter((r) => r.kind === "failed" || r.kind === "conflict").length} 本，取消 ${results.filter((r) => r.kind === "canceled").length} 本。`;
+        if (results.some(result => ["failed", "conflict", "canceled"].includes(result.kind)))
+          this.importNotice = message;
+        else this.notifySuccess(message);
       } catch (error) {
         this.error = String(error);
       } finally {

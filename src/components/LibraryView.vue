@@ -5,7 +5,14 @@ import {
   PhClockCounterClockwise,
   PhFolderNotchOpen,
 } from "@phosphor-icons/vue";
-import { computed, ref, watch } from "vue";
+import {
+  computed, ref, watch, toRef, onMounted, onBeforeUnmount, nextTick,
+} from "vue";
+import BookDetailsPanel from "./BookDetailsPanel.vue";
+import SeriesShelf from "./SeriesShelf.vue";
+import BookCover from "./BookCover.vue";
+import { groupSeries, seriesKey, sortVolumes } from "../lib/series";
+import { filterBooks } from "../lib/library";
 import ContinueReading from "./ContinueReading.vue";
 import BookCard from "./BookCard.vue";
 import BookEditor from "./BookEditor.vue";
@@ -18,16 +25,25 @@ import { useReaderStore } from "../stores/reader";
 import { useAppearanceStore } from "../stores/appearance";
 import { pickBookFiles, type LibraryBook } from "../api/library";
 import { sortBooks } from "../lib/library";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { assignSeries } from "../api/library";
 import { pickFolder } from "../api/backend";
 const library = useLibraryStore(),
   reader = useReaderStore(),
   appearance = useAppearanceStore();
-const limit = ref(60),
-  guideTarget = ref(""),
+const limit = computed({
+  get: () => (library.activeSeries ? library.seriesBookLimit : library.bookLimit),
+  set: (value) => {
+    if (library.activeSeries) library.seriesBookLimit = value;
+    else library.bookLimit = value;
+  },
+});
+const guideTarget = ref(""),
   managementOpen = ref(false),
   navigationOpen = ref(false);
-const selectedIds = ref<number[]>([]),
+const selectedIds = toRef(library, "selectedIds"),
   editingBook = ref<LibraryBook | null>(null);
+const detailBook = ref<LibraryBook | null>(null);
 const busy = computed(
   () =>
     library.managing ||
@@ -37,28 +53,190 @@ const busy = computed(
     reader.favoritePending ||
     library.favoritePending.size > 0,
 );
-const sort = ref<"recent" | "title" | "series">("recent");
+const content = ref<HTMLElement | null>(null);
+const renamedSeries = ref("");
+async function renameSeries(remove = false) {
+  const group = activeGroup.value;
+  if (!group || busy.value) return;
+  const name = remove ? "" : renamedSeries.value.trim();
+  if (!remove && !name) {
+    library.error = "請輸入系列名稱。";
+    return;
+  }
+  library.managing = true;
+  try {
+    if (
+      remove &&
+      !(await ask("移除整個系列歸屬？書籍與來源仍保留。", {
+        title: "移除系列歸屬",
+        kind: "warning",
+      }))
+    )
+      return;
+    await reader.flushProgress();
+    await assignSeries(
+      group.books.map((b) => b.id),
+      name,
+    );
+    library.activeSeries = remove ? null : seriesKey(name);
+    await library.refresh();
+  } catch (e) {
+    library.error = String(e);
+  } finally {
+    library.managing = false;
+  }
+}
+const sort = computed({
+  get: () => (library.activeSeries ? library.seriesSort : library.sort),
+  set: (value) => {
+    if (library.activeSeries) library.seriesSort = value;
+    else library.sort = value;
+  },
+});
+const query = computed({
+  get: () => (library.activeSeries ? library.seriesQuery : library.query),
+  set: (value) => {
+    if (library.activeSeries) library.seriesQuery = value;
+    else library.query = value;
+  },
+});
+const groups = computed(() => groupSeries(library.books));
+const activeGroup = computed(() =>
+  groups.value.find((g) => g.key === library.activeSeries),
+);
+watch(
+  () => activeGroup.value?.name,
+  (name) => {
+    renamedSeries.value = name ?? "";
+  },
+  { immediate: true },
+);
+const seriesLimit = toRef(library, "seriesLimit");
+const visibleGroups = computed(() => {
+  const ids = new Set(library.visibleBooks.map((b) => b.id));
+  return groups.value.filter((g) => g.books.some((b) => ids.has(b.id)));
+});
+// The narrow layout scrolls the outer container; desktop scrolls its content.
+const layout = ref<HTMLElement | null>(null);
+const narrow = ref(window.matchMedia("(max-width: 700px)").matches);
+let restoring = true;
+let restoreGeneration = 0;
+let disposed = false;
+function scrollOwner() {
+  return narrow.value ? layout.value : content.value;
+}
+function positionCards(owner: HTMLElement) {
+  return Array.from(owner.querySelectorAll<HTMLElement>("[data-book-id], [data-series-key]"));
+}
+function positionKey(card: HTMLElement) {
+  return card.dataset.bookId
+    ? `book:${card.dataset.bookId}`
+    : `series:${card.dataset.seriesKey}`;
+}
+function recordScroll(event?: Event) {
+  const owner = scrollOwner();
+  if (!owner || restoring || (event && event.target !== owner)) return;
+  const top = owner.getBoundingClientRect().top;
+  const bottom = owner.getBoundingClientRect().bottom;
+  const card = positionCards(owner).find((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.bottom > top && rect.top < bottom;
+  });
+  const anchor = card
+    ? { key: positionKey(card), offset: card.getBoundingClientRect().top - top }
+    : null;
+  if (library.activeSeries) {
+    library.seriesScrollTop = owner.scrollTop;
+    library.seriesScrollAnchor = anchor;
+  } else {
+    library.scrollTop = owner.scrollTop;
+    library.scrollAnchor = anchor;
+  }
+}
+async function restoreScroll() {
+  restoring = true;
+  const generation = ++restoreGeneration;
+  await nextTick();
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  if (disposed || generation !== restoreGeneration || library.loading) return;
+  const owner = scrollOwner();
+  if (owner) {
+    owner.scrollTop = library.activeSeries ? library.seriesScrollTop : library.scrollTop;
+    const anchor = library.activeSeries ? library.seriesScrollAnchor : library.scrollAnchor;
+    const card = anchor && positionCards(owner).find((el) => positionKey(el) === anchor.key);
+    if (card && anchor) {
+      owner.scrollTop += card.getBoundingClientRect().top
+        - owner.getBoundingClientRect().top - anchor.offset;
+    }
+  }
+  // Ignore scroll events generated by restoring the DOM after a refresh.
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  if (!disposed && generation === restoreGeneration) restoring = false;
+}
+async function enterSeries(key: string) {
+  recordScroll();
+  restoring = true;
+  library.activeSeries = key;
+  library.seriesBookLimit = 60;
+  library.seriesQuery = "";
+  library.seriesScrollTop = 0;
+  library.seriesScrollAnchor = null;
+  renamedSeries.value = activeGroup.value?.name ?? "";
+  await restoreScroll();
+}
+async function backSeries() {
+  restoring = true;
+  library.activeSeries = null;
+  await restoreScroll();
+}
+function resize() {
+  narrow.value = window.matchMedia("(max-width: 700px)").matches;
+  void restoreScroll();
+}
+onMounted(() => {
+  window.addEventListener("resize", resize);
+  void restoreScroll();
+});
+onBeforeUnmount(() => {
+  recordScroll();
+  disposed = true;
+  ++restoreGeneration;
+  window.removeEventListener("resize", resize);
+});
+watch(() => library.loading, (loading) => {
+  if (!loading) void restoreScroll();
+}, { flush: "post" });
 const filters: { id: LibraryFilter; label: string }[] = [
   { id: "all", label: "全部書籍" },
   { id: "favorites", label: "我的收藏" },
   { id: "recent", label: "最近閱讀" },
   { id: "missing", label: "來源失效" },
 ];
-const sortedBooks = computed(() => sortBooks(library.visibleBooks, sort.value));
-const shownBooks = computed(() => sortedBooks.value.slice(0, limit.value));
-// Selection survives appearance/filter changes; only removed records are dropped.
-watch(
-  () => [
-    library.query,
+const sortedBooks = computed(() => {
+  if (!library.activeSeries) return sortBooks(library.visibleBooks, sort.value);
+  const books = filterBooks(
+    library.books.filter((b) => seriesKey(b.series) === library.activeSeries),
+    library.seriesQuery,
     library.filter,
     library.statusFilter,
     library.tagFilter,
-    sort.value,
-  ],
-  () => {
-    limit.value = 60;
-  },
+  );
+  return sort.value === "series"
+    ? sortVolumes(books)
+    : sortBooks(books, sort.value);
+});
+const shownBooks = computed(() => sortedBooks.value.slice(0, limit.value));
+const hiddenSelectionCount = computed(() =>
+  selectedIds.value.filter(id => !shownBooks.value.some(book => book.id === id)).length,
 );
+// Selection survives appearance/filter changes; only removed records are dropped.
+watch(() => [library.query, library.sort, library.filter, library.statusFilter, library.tagFilter], () => {
+  library.bookLimit = 60;
+  library.seriesLimit = 60;
+});
+watch(() => [library.seriesQuery, library.seriesSort, library.filter, library.statusFilter, library.tagFilter], () => {
+  library.seriesBookLimit = 60;
+});
 watch(
   () => library.books,
   () => {
@@ -97,6 +275,7 @@ function selectBook(id: number) {
 }
 function clearFilters() {
   library.query = "";
+  library.seriesQuery = "";
   library.filter = "all";
   library.statusFilter = "all";
   library.tagFilter = null;
@@ -110,7 +289,7 @@ const resultLabels = {
 };
 </script>
 <template>
-  <main class="library-layout">
+  <main ref="layout" class="library-layout" @scroll="recordScroll">
     <button
       class="navigation-toggle"
       :aria-expanded="navigationOpen"
@@ -130,12 +309,35 @@ const resultLabels = {
       </div>
       <nav aria-label="書庫篩選">
         <button
+          :aria-pressed="library.section === 'series'"
+          :disabled="busy"
+          @click="
+            library.section = 'series';
+            library.activeSeries = null;
+          "
+        >
+          系列書架<span>{{ groups.length }}</span>
+        </button>
+        <button
           v-for="filter in filters"
           :key="filter.id"
-          :aria-pressed="library.filter === filter.id"
-          :class="{ active: library.filter === filter.id }"
+          :aria-pressed="
+            library.filter === filter.id &&
+            library.section === 'books' &&
+            !library.activeSeries
+          "
+          :class="{
+            active:
+              library.filter === filter.id &&
+              library.section === 'books' &&
+              !library.activeSeries,
+          }"
           :disabled="library.managing"
-          @click="library.filter = filter.id"
+          @click="
+            library.section = 'books';
+            library.activeSeries = null;
+            library.setFilter(filter.id);
+          "
         >
           <span class="nav-label"
             ><component
@@ -200,13 +402,25 @@ const resultLabels = {
       </div>
       <p class="local-note">本機資料 · 無需帳號<br />原始漫畫檔案留在原位</p>
     </aside>
-    <div class="library-content">
+    <div
+      ref="content"
+      class="library-content"
+      :class="{ 'detail-open': detailBook }"
+      @scroll="recordScroll"
+    >
       <header class="library-header">
         <div>
           <p class="eyebrow">
             {{ managementOpen ? "整理你的收藏" : "收藏好故事，隨時接著讀" }}
           </p>
-          <h1>{{ filters.find((f) => f.id === library.filter)?.label }}</h1>
+          <h1>
+            {{
+              activeGroup?.name ??
+              (library.section === "series"
+                ? "系列書架"
+                : filters.find((f) => f.id === library.filter)?.label)
+            }}
+          </h1>
         </div>
         <div
           class="actions"
@@ -237,9 +451,13 @@ const resultLabels = {
         <label class="search"
           ><span class="sr-only">搜尋書庫</span
           ><input
-            v-model="library.query"
+            v-model="query"
             type="search"
-            placeholder="搜尋書名、系列、標籤或備註…"
+            :placeholder="
+              library.activeSeries
+                ? '搜尋此系列…'
+                : '搜尋書名、系列、標籤或備註…'
+            "
             aria-label="搜尋書名"
             :disabled="library.managing"
         /></label>
@@ -269,10 +487,63 @@ const resultLabels = {
           </button>
         </div>
       </div>
+      <section v-if="library.activeSeries" class="series-heading">
+        <button :disabled="busy" @click="backSeries">返回書架</button>
+        <template v-if="activeGroup"
+          ><BookCover
+            :key="activeGroup.cover.id"
+            :id="activeGroup.cover.id"
+            :available="activeGroup.cover.available"
+            :title="activeGroup.name"
+          />
+          <div>
+            <h2>{{ activeGroup.name }}</h2>
+            <p>
+              {{ activeGroup.books.length }} 冊 · 已讀
+              {{ activeGroup.read }} 冊（{{ activeGroup.percent }}%）
+            </p>
+            <p>
+              頁面平均 {{ activeGroup.pagePercent }}% ·
+              {{ activeGroup.missing }} 冊來源失效
+            </p>
+            <button
+              v-if="activeGroup.resume"
+              class="primary"
+              :disabled="busy"
+              @click="openBook(activeGroup.resume.id)"
+            >
+              繼續閱讀
+              {{
+                activeGroup.resume.volume
+                  ? `第 ${activeGroup.resume.volume} 集`
+                  : activeGroup.resume.title
+              }}
+            </button>
+            <details class="series-management-disclosure">
+              <summary>整理系列</summary>
+              <div class="series-management">
+                <label
+                  >系列名稱<input
+                    v-model="renamedSeries"
+                    maxlength="256"
+                    :disabled="busy" /></label
+                ><button :disabled="busy" @click="renameSeries()">
+                  重新命名系列</button
+                ><button :disabled="busy" @click="renameSeries(true)">
+                  移除系列歸屬
+                </button>
+              </div>
+            </details>
+          </div></template
+        >
+        <p v-else>系列已改名或移除歸屬，請返回書架。</p>
+      </section>
       <LibraryManager
         v-if="managementOpen"
         :selected-ids="selectedIds"
         :shown-count="shownBooks.length"
+        :hidden-count="hiddenSelectionCount"
+        @retain-shown="selectedIds = selectedIds.filter(id => shownBooks.some(book => book.id === id))"
         @clear="selectedIds = []"
         @select-shown="
           selectedIds = Array.from(
@@ -286,6 +557,15 @@ const resultLabels = {
       </p>
       <p v-if="reader.error" class="notice error" role="alert">
         {{ reader.error }}
+        <button v-if="reader.missingBookId !== null" :disabled="busy" @click="
+          library.section = 'books';
+          library.activeSeries = null;
+          library.query = '';
+          library.statusFilter = 'all';
+          library.tagFilter = null;
+          managementOpen = true;
+          library.setFilter('missing');
+        ">前往來源失效／重新指定</button>
       </p>
       <p v-if="library.importNotice" class="notice" role="status">
         {{ library.importNotice }}
@@ -343,13 +623,38 @@ const resultLabels = {
           !library.query.trim() &&
           library.statusFilter === 'all' &&
           library.tagFilter === null &&
-          !managementOpen
+          !managementOpen &&
+          !library.activeSeries
         "
         :key="`${library.continueBook?.id}:${library.revision}`"
         :book="library.continueBook!"
         :busy="busy"
         @open="openBook"
       />
+      <section
+        v-if="!library.activeSeries && !managementOpen && library.books.length"
+        class="home-series"
+      >
+        <h2>{{ library.section === "series" ? "全部系列" : "我的系列" }}</h2>
+        <SeriesShelf
+          :groups="
+            library.section === 'series'
+              ? visibleGroups.slice(0, seriesLimit)
+              : visibleGroups.slice(0, 4)
+          "
+          :busy="busy"
+          @open="enterSeries"
+        />
+        <button
+          v-if="
+            library.section === 'series' && seriesLimit < visibleGroups.length
+          "
+          :disabled="busy"
+          @click="seriesLimit += 60"
+        >
+          顯示更多系列
+        </button>
+      </section>
       <p v-if="library.filter === 'missing'" class="notice">
         來源可能暫時離線或已移動。資料會保留；進入管理、選取一本後重新指定同一本漫畫來源。
       </p>
@@ -366,12 +671,15 @@ const resultLabels = {
         <p>試試其他關鍵字或清除條件。</p>
         <button @click="clearFilters">清除搜尋與篩選</button>
       </section>
-      <template v-else
+      <template
+        v-else-if="
+          library.section !== 'series' || library.activeSeries || managementOpen
+        "
         ><p class="results" aria-live="polite">
           {{ sortedBooks.length }} 本書{{ reader.loading ? " · 正在開啟…" : ""
           }}{{
             managementOpen
-              ? ` · 已選 ${selectedIds.length} 本（包含其他篩選中的選取）`
+              ? ` · 已選 ${selectedIds.length} 本${hiddenSelectionCount ? `（包含 ${hiddenSelectionCount} 本未顯示的選取）` : ''}`
               : ""
           }}
         </p>
@@ -395,15 +703,17 @@ const resultLabels = {
             v-for="book in shownBooks"
             :key="`${book.id}:${library.revision}`"
             :book="book"
+            :data-book-id="book.id"
             :view="appearance.settings.view"
             :opening="busy"
             :favorite-pending="busy || library.favoritePending.has(book.id)"
             :selectable="managementOpen"
             :selected="selectedIds.includes(book.id)"
+            :focused="detailBook?.id === book.id"
             @open="openBook"
             @favorite="library.toggleFavorite"
             @select="selectBook"
-            @edit="editingBook = $event"
+            @edit="detailBook = $event"
           />
         </section>
         <button
@@ -420,6 +730,19 @@ const resultLabels = {
         <p>閱讀狀態與續讀位置分開保存 · 來源失效不會自動移除書籍</p>
       </footer>
     </div>
+    <BookDetailsPanel
+      v-if="detailBook"
+      :book="detailBook"
+      @close="detailBook = null"
+      @edit="
+        editingBook = $event;
+      "
+      @manage="
+        selectedIds = [$event.id];
+        managementOpen = true;
+        detailBook = null;
+      "
+    />
     <BookEditor
       v-if="editingBook"
       :book="editingBook"
@@ -428,6 +751,57 @@ const resultLabels = {
   </main>
 </template>
 <style scoped>
+@media (min-width: 1100px) {
+  .library-content.detail-open {
+    padding-right: calc(var(--detail-width) + 24px);
+  }
+}
+.series-management {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.series-management-disclosure {
+  margin-top: 14px;
+}
+.series-management-disclosure summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--accent-soft);
+}
+.series-management label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.series-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.series-heading :deep(.book-cover) {
+  width: 100px;
+  flex: 0 0 100px;
+}
+.series-heading p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 8px 0;
+}
+.home-series {
+  margin: 28px 0;
+}
+.home-series > h2 {
+  font-family: var(--heading-font);
+  font-size: 24px;
+  margin-bottom: 20px;
+}
 .library-layout {
   flex: 1;
   min-height: 0;
@@ -584,10 +958,9 @@ h2 {
 .detail-heading > div {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) minmax(
-      120px,
-      1fr
-    ) 68px;
+  grid-template-columns:
+    minmax(130px, 1.4fr) minmax(90px, 1fr) minmax(120px, 1fr)
+    68px;
   gap: 20px;
   padding: 0 4px;
 }

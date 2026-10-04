@@ -110,10 +110,53 @@ fn open_source(
     state: &AppState,
     library: &Library,
 ) -> Result<BookInfo, String> {
+    open_source_at(path, resume, selected_id, None, state, library)
+}
+
+#[tauri::command]
+pub fn open_bookmark(
+    book_id: i64,
+    id: i64,
+    state: State<AppState>,
+    library: State<Library>,
+) -> Result<BookInfo, String> {
+    let mark = library
+        .bookmarks(book_id)?
+        .into_iter()
+        .find(|m| m.id == id)
+        .ok_or("書籤已不存在。")?;
+    let entry = library.get(book_id)?;
+    open_source_at(
+        &entry.path,
+        true,
+        Some(book_id),
+        Some(&mark.page_name),
+        &state,
+        &library,
+    )
+}
+fn open_source_at(
+    path: &str,
+    resume: bool,
+    selected_id: Option<i64>,
+    bookmark_page: Option<&str>,
+    state: &AppState,
+    library: &Library,
+) -> Result<BookInfo, String> {
     let result = book::open(path)?;
-    let saved = library.register_selected(&result.book, selected_id)?;
     let pages = result.book.page_names();
-    let start_index = if resume {
+    let bookmark_index = bookmark_page
+        .map(|name| {
+            pages
+                .iter()
+                .position(|p| p == name)
+                .ok_or("書籤頁面已不存在，未跳轉，也未替換目前書籍。".to_string())
+        })
+        .transpose()?;
+    let saved = library.register_selected(&result.book, selected_id)?;
+    let start_index = if let Some(index) = bookmark_index {
+        index
+    } else if resume {
         library::resume_index(&saved, &pages)
     } else {
         result.start_index
@@ -304,6 +347,70 @@ fn spawn_preload_worker(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bookmark_open_follows_page_name_and_missing_page_preserves_session_and_database() {
+        let root = std::env::temp_dir().join(format!(
+            "mangafolio-bookmark-session-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("pages")).unwrap();
+        for name in ["1.png", "2.png"] {
+            image::RgbImage::new(4, 4)
+                .save(root.join("pages").join(name))
+                .unwrap();
+        }
+        let library = Library::open(&root.join("data")).unwrap();
+        let state = AppState::default();
+        let path = root.join("pages").to_string_lossy().into_owned();
+        let first = open_source(&path, true, None, &state, &library).unwrap();
+        let bookmark = library
+            .save_bookmark(&library::Bookmark {
+                id: 0,
+                book_id: first.book_id,
+                page_name: "2.png".into(),
+                page_index: 1,
+                name: "標記".into(),
+                note: "".into(),
+            })
+            .unwrap();
+        image::RgbImage::new(4, 4)
+            .save(root.join("pages/0.png"))
+            .unwrap();
+        let opened = open_source_at(
+            &path,
+            true,
+            Some(first.book_id),
+            Some(&bookmark.page_name),
+            &state,
+            &library,
+        )
+        .unwrap();
+        assert_eq!(opened.start_index, 2);
+        std::fs::remove_file(root.join("pages/2.png")).unwrap();
+        let before = library.backup_json().unwrap();
+        let session = state.book.lock().unwrap().as_ref().unwrap().0;
+        assert!(open_source_at(
+            &path,
+            true,
+            Some(first.book_id),
+            Some(&bookmark.page_name),
+            &state,
+            &library
+        )
+        .err()
+        .unwrap()
+        .contains("書籤頁面已不存在"));
+        assert_eq!(session, state.book.lock().unwrap().as_ref().unwrap().0);
+        assert_eq!(before, library.backup_json().unwrap());
+        drop(state);
+        drop(library);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn unique_alias_and_offline_restore_open_selected_id_with_reading_state() {

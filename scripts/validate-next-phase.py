@@ -20,6 +20,7 @@ window.calls=[];window.confirmResult=true;window.failRemoval=false;window.failRe
 window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},transformCallback:()=>1,unregisterCallback:()=>{},invoke:async(cmd,args={})=>{
 window.calls.push({cmd,args});
 if(cmd==='list_library')return structuredClone(window.testBooks);
+if(cmd==='list_bookmarks')return [];
 if(cmd==='list_tags')return structuredClone(window.testTags);
 if(cmd==='library_cover')return Uint8Array.from(atob(COVERS[(args.id-1)%4]),c=>c.charCodeAt(0)).buffer;
 if(cmd==='plugin:app|version')return '0.1.4';
@@ -38,6 +39,7 @@ if(cmd==='assign_book_tag')window.testBooks.forEach(b=>{if(args.ids.includes(b.i
 if(cmd==='edit_library_book'){if(window.failEdit)throw 'TEST edit failed';const b=window.testBooks.find(b=>b.id===args.id);Object.assign(b,args.details);b.title=b.customTitle||b.sourceTitle;return structuredClone(b);}
 if(cmd==='remove_library_books'){if(window.failRemoval)throw 'TEST deletion failed';window.testBooks=window.testBooks.filter(b=>!args.ids.includes(b.id));}
 if(cmd==='relink_library_book'){const b=window.testBooks.find(b=>b.id===args.id);b.path=args.path;b.available=true;return b;}
+if(cmd==='preview_library_backup'){if(window.failRestore)return {added:0,skipped:0,conflicts:0,unsupported:1,issues:['TEST invalid backup'],canRestore:false,version:4};return {added:0,skipped:4,conflicts:0,unsupported:0,issues:[],canRestore:true,version:3};}
 if(cmd==='restore_library_backup'){if(window.failRestore)throw 'TEST invalid backup';return {added:0,skipped:4};}
 if(cmd==='import_book_result'){await new Promise(r=>setTimeout(r,80));if(args.path.includes('failed'))throw 'TEST source unreadable';if(args.path.includes('conflict'))throw '來源衝突：多筆來源匹配';const exists=window.testBooks.find(b=>b.path===args.path);if(exists)return {book:exists,kind:'updated'};const b=window.makeBook(window.testBooks.length+1,'新增漫畫');b.path=args.path;b.available=true;window.testBooks.push(b);return {book:b,kind:'added'};}
 return null;
@@ -90,6 +92,7 @@ with sync_playwright() as p:
   page.get_by_label('書庫檢視',exact=True).select_option(view)
   page.get_by_text('外觀設定',exact=True).click()
   page.set_viewport_size({'width':1440,'height':1200})
+  page.locator('.library-content').evaluate('(el)=>el.scrollTop=0')
   page.screenshot(path=str(images/f'{style}-{theme}-{view}.png'))
   page.set_viewport_size({'width':1440,'height':1000})
   page.get_by_text('外觀設定',exact=True).click()
@@ -152,7 +155,8 @@ with sync_playwright() as p:
  page.wait_for_function('testTags.length===2')
  assert page.locator('.book-card').count()==4
  checks.append('tag create/rename/delete leaves books intact')
- page.get_by_role('button',name='編輯資訊：海邊故事',exact=True).click()
+ page.get_by_role('button',name='查看資訊：海邊故事',exact=True).click()
+ page.get_by_role('button',name='編輯資訊',exact=True).click()
  page.get_by_label('自訂書名',exact=True).fill('自訂海邊故事')
  page.get_by_label('系列',exact=True).fill('海邊系列')
  page.get_by_label('集數',exact=True).fill('10')
@@ -185,9 +189,10 @@ with sync_playwright() as p:
  assert page.evaluate('testBooks.length')==4
  page.evaluate('window.failRestore=false')
  page.get_by_role('button',name='還原書庫備份',exact=True).click()
- page.get_by_text('還原完成：加入 0 本，略過 4 本既有來源。',exact=True).wait_for()
+ page.get_by_role('button',name='確認合併還原',exact=True).click()
+ page.get_by_text('已合併還原 0 本書，略過 4 本既有來源。',exact=True).wait_for()
  page.get_by_role('button',name='匯出書庫備份',exact=True).click()
- page.get_by_text('備份已匯出：',exact=False).wait_for()
+ page.get_by_text('備份已匯出；',exact=False).wait_for()
  checks.append('missing-source relink, export and invalid/valid restore have actionable UI states')
  page.get_by_role('button',name='結束管理',exact=True).click()
  page.get_by_role('button',name='加入 ZIP／CBZ',exact=True).click()

@@ -1,0 +1,23 @@
+{
+  "browser-backup": {
+    "command": "python3 scripts/validate-backup-panel-recovery.py",
+    "exitCode": 0,
+    "outputOverrides": {}
+  },
+  "browser-library": {
+    "command": "python3 scripts/validate-next-phase.py",
+    "exitCode": 0,
+    "outputOverrides": {
+      "MANGAFOLIO_UI_RESULT_DIR": "docs/third-phase-t2-ui1-results/browser-library",
+      "MANGAFOLIO_UI_IMAGE_DIR": "docs/third-phase-t2-ui1-results/browser-library/screens"
+    }
+  },
+  "browser-third": {
+    "command": "python3 scripts/validate-third-phase.py",
+    "exitCode": 0,
+    "outputOverrides": {
+      "MANGAFOLIO_THIRD_RESULT_DIR": "docs/third-phase-t2-ui1-results/browser-third",
+      "MANGAFOLIO_THIRD_IMAGE_DIR": "/tmp/mangafolio-t2-ui1-third-screens"
+    }
+  }
+}
