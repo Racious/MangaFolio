@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from "vue";
 import { loadCover } from "../api/covers";
-const props = defineProps<{ id: number; available: boolean; title: string }>();
+const props = defineProps<{ id: number; available: boolean; title: string; revision?: number }>();
 const cover = ref<string | null>(null);
 let disposed = false,
   generation = 0;
 watch(
-  () => [props.id, props.available] as const,
+  () => [props.id, props.available, props.revision] as const,
   () => {
     const token = ++generation;
     if (cover.value) URL.revokeObjectURL(cover.value);
     cover.value = null;
-    if (!props.available) return;
     loadCover(props.id, () => disposed || token !== generation)
       .then((url) => {
         if (disposed || token !== generation) {

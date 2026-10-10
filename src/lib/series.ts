@@ -15,6 +15,7 @@ export interface SeriesGroup {
 export function groupSeries(books: LibraryBook[]): SeriesGroup[] {
   const groups = new Map<string, LibraryBook[]>();
   for (const book of books) {
+    if (book.format === "video") continue;
     const key = seriesKey(book.series);
     if (key) {
       const group = groups.get(key) ?? [];
@@ -76,7 +77,7 @@ export function nextVolume(
 ): { book?: LibraryBook; reason: string } {
   const key = seriesKey(current.series);
   if (!key) return { reason: "這本書尚未指定系列。" };
-  const series = books.filter((b) => seriesKey(b.series) === key),
+  const series = books.filter((b) => b.format !== "video" && seriesKey(b.series) === key),
     seen = new Set<number>();
   for (const b of series) {
     const n = numericVolume(b.volume);

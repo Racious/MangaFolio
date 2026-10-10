@@ -1,0 +1,88 @@
+/* Layouts change navigation and composition; palettes are independent in appearance store. */
+:root:is([data-style=workbench],[data-style=gallery],[data-style=studio]) {
+  --sidebar-width: 284px; --cover-min: 180px; --radius: 9px; --space: 24px;
+  --grid-surface: transparent; --grid-outline: transparent; --grid-inset: 0;
+  --grid-details-space: 12px 0; --grid-cover-shadow: 0 6px 18px #0002;
+  --heading-font: "Segoe UI", "Microsoft JhengHei", sans-serif;
+  --detail-width: 320px; --hero-min-height: 88px;
+}
+:root[data-style=gallery] { --content-padding: 40px 52px; --cover-min: 185px; --space: 22px; --heading-font: "Noto Serif CJK TC", "PMingLiU", serif; }
+:root[data-style=studio] { --sidebar-width: 132px; --content-padding: 36px; --cover-min: 190px; --space: 28px; --radius: 6px; --detail-width:344px; }
+:root:is([data-style=workbench],[data-style=gallery],[data-style=studio])[data-cover-size=small] { --cover-min: 150px; }
+:root:is([data-style=workbench],[data-style=gallery],[data-style=studio])[data-cover-size=large] { --cover-min: 260px; }
+:root:is([data-style=workbench],[data-style=gallery],[data-style=studio])[data-density=compact] { --space: 16px; --content-padding: 24px; }
+.style-navigation { flex:0 0 var(--sidebar-width); overflow:auto; border-right:1px solid var(--line); }
+.top-navigation { flex:0 0 auto; }
+.layout-gallery { flex-direction:column; }
+.layout-workbench .brand { font-size:26px; }
+.layout-workbench .navigation { padding:34px 18px; }
+.layout-workbench h1 { font-size:40px; }
+.layout-gallery h1 { font-size:44px; }
+.layout-gallery .add-trigger { border-radius:30px; padding:12px 24px; }
+.layout-studio h1 { font-size:34px; }
+.collection-caption { font-size:13px; color:var(--text-dim); margin-top:10px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .notice[role=status] { position:fixed; right:24px; bottom:24px; z-index:25; width:max-content; max-width:min(440px,calc(100vw - 48px)); margin:0; box-shadow:0 8px 28px #0003; border-color:var(--accent); background:var(--panel); }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .library-header { margin-bottom:28px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .library-controls { margin-bottom:28px; }
+:is(.layout-gallery,.layout-studio) .library-header h1 { display:inline-block; line-height:1.2; margin:0; }
+:is(.layout-gallery,.layout-studio) .collection-caption { display:inline-block; margin:0 0 0 16px; }
+:is(.layout-gallery,.layout-studio) .library-header { margin-bottom:18px; }
+:is(.layout-gallery,.layout-studio) .library-controls { margin-bottom:18px; }
+.layout-gallery .library-content { padding:28px 52px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .results { display:none; }
+.active-filters { display:flex; gap:8px; flex-wrap:wrap; margin:-8px 0 22px; }
+.active-filters button { border-radius:24px; padding:7px 12px; font-size:12px; background:var(--bg-soft); }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .card-action { inset:auto 0 0; height:80px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid h2 { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; font-size:15px; line-height:1.6; padding-right:40px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .details { min-height:72px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid :is(.metadata,.tags,.page-count,.edit) { display:none; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .reading-state { font-size:12px; color:var(--text-dim); margin-top:4px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .favorite { top:3px; right:-6px; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .cover { aspect-ratio: 2 / 3; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid .progress { height:3px; margin-top:8px; }
+.cover-action { position:absolute; left:50%; top:50%; transform:translate(-50%,-40%); display:flex; gap:7px; align-items:center; white-space:nowrap; padding:10px 14px; border-radius:7px; background:#16191de8; color:#fff; opacity:0; transition:opacity .16s,transform .16s; pointer-events:none; font-size:13px; box-shadow:0 6px 24px #0004; }
+.cover:hover .cover-action, .cover:focus-visible .cover-action { opacity:1; transform:translate(-50%,-50%); }
+.book-card .cover { transition:box-shadow .16s,transform .16s; }
+.book-card.grid .cover:hover:not(:disabled) { box-shadow:0 9px 26px #0004; transform:translateY(-2px); }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid.focused { background:transparent; box-shadow:none; }
+:is(.layout-workbench,.layout-gallery,.layout-studio) .book-card.grid.focused .cover { outline:2px solid var(--accent); outline-offset:4px; }
+.layout-gallery .continue-panel { min-height:80px; padding:8px 18px; gap:18px; margin-bottom:18px; }
+.layout-gallery .resume-background, .layout-gallery :is(.resume-series,.resume-note,.resume-progress) { display:none; }
+.layout-gallery .resume-cover { display:block; width:48px; height:64px; border-radius:4px; }
+.layout-gallery .resume-info { display:grid; grid-template-columns:1fr auto; align-items:center; gap:3px 24px; flex:1; max-width:none; padding:0; background:transparent; }
+.layout-gallery .resume-label { grid-column:1; margin:0; font-size:11px; }
+.layout-gallery .resume-info h2 { grid-column:1; margin:0; font-size:17px; }
+.layout-gallery .resume-page { grid-column:1; }
+.layout-gallery .resume-info button { display:flex; align-items:center; gap:8px; grid-column:2; grid-row:1 / 4; margin:0; padding:10px 18px; }
+.detail-panel.centered-detail { inset:0; margin:auto; width:min(540px,calc(100vw - 32px)); height:auto; max-height:calc(100dvh - 40px); border:1px solid var(--line); border-radius:14px; }
+.detail-panel.centered-detail::backdrop { background:#0009; }
+.layout-studio .detail-panel .book-cover { max-width:260px; aspect-ratio:2 / 3; }
+.layout-studio .detail-panel { padding:30px; }
+.layout-studio .detail-panel h2 { font-size:26px; }
+.layout-studio .compact-overview { font-size:13px; color:var(--text-dim); line-height:1.9; margin-bottom:20px; }
+.layout-studio .detail-panel .panel-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:20px 0; }
+.layout-studio .panel-actions .primary { grid-column:1 / -1; padding:15px; font-size:15px; }
+.extra-info summary, .reading-extras summary { cursor:pointer; padding:12px 0; color:var(--text-dim); font-size:13px; }
+:root[data-custom-colors=true] :is(dialog,button:not(.favorite):not(.edit):not(.card-action):not(.help-entry):not(.settings-entry),input,select,textarea,.navigation:not(.gallery),.add-options,.filter-fields) {
+  --text:var(--panel-text); --text-dim:var(--panel-muted); --accent-soft:var(--panel-accent); --bg-soft:var(--panel-soft); --border:var(--panel-border);
+}
+:root[data-custom-colors=true] dialog { --focus:var(--panel-text); }
+:root[data-custom-colors=true] .navigation.gallery button { color:var(--background-text); }
+:root[data-custom-colors=true] .view-switch button[aria-pressed=false] { color:var(--background-text); }
+:root[data-custom-colors=true] button.primary { color:var(--accent-ink); }
+@media(min-width:1400px) {
+  .layout-workbench .book-collection.grid { grid-template-columns:repeat(auto-fill,minmax(min(var(--cover-min),100%),1fr)); }
+}
+@media(max-width:700px) {
+  .layout-workbench .navigation { padding:12px; gap:12px; }
+  .layout-workbench .brand { font-size:18px; }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) h1 { font-size:28px; }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) .collection-caption { display:block; margin:8px 0 0; }
+  .style-navigation { border-right:0; border-bottom:1px solid var(--line); }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) .library-content { padding:20px 16px; }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) .library-controls { gap:8px; }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) .book-collection.grid { grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr)); gap:18px 14px; }
+  :is(.layout-workbench,.layout-gallery,.layout-studio) .filter-fields { right:auto; left:0; }
+  .layout-gallery .resume-info { column-gap:12px; } .layout-gallery .resume-info h2 { font-size:15px; }
+  .layout-gallery .resume-info button { padding:10px; }
+}

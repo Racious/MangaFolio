@@ -4,6 +4,7 @@ mod cache;
 mod commands;
 mod image_pipeline;
 mod library;
+mod media_source;
 mod sorting;
 
 use commands::AppState;
@@ -17,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .manage(media_source::ScanState::default())
         .setup(|app| {
             let directory = app.path().app_data_dir()?;
             let library = library::Library::open(&directory).map_err(std::io::Error::other)?;
@@ -38,6 +40,14 @@ pub fn run() {
             library::relink_library_book,
             library::export_library_backup,
             library::import_book_result,
+            library::open_library_video,
+            library::show_library_source_location,
+            media_source::scan_library_sources,
+            media_source::cancel_library_scan,
+            library::list_library_roots,
+            library::remember_library_roots,
+            library::forget_library_root,
+            library::replace_library_cover,
             library::edit_library_book,
             library::set_reading_status,
             library::list_tags,

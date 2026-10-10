@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
+import { PhBookOpen } from "@phosphor-icons/vue";
 import { loadCover } from "../api/covers";
 import type { LibraryBook } from "../api/library";
 import { progressPercent } from "../lib/library";
@@ -44,7 +45,7 @@ onUnmounted(() => {
         <span :style="{ width: `${progressPercent(book)}%` }" />
       </div>
       <button class="primary" :disabled="busy" @click="$emit('open', book.id)">
-        接著讀
+        <PhBookOpen :size="18" aria-hidden="true" /> 接著讀
       </button>
     </div>
   </section>

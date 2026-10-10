@@ -52,6 +52,13 @@ test("search handles Chinese names, width normalization, case and surrounding sp
   assert.equal(filterBooks(books, "missing", "all").length, 0);
 });
 
+test("media type composes with category, search, favorites and manual status", () => {
+  const comic = book(1,"同名",true), video = book(2,"同名",true);
+  video.format = "video"; video.readingStatus = "read"; video.tags = [{id:5,name:"動畫"}];
+  assert.deepEqual(filterBooks([comic,video],"動畫","favorites","read",5,"video").map(b=>b.id),[2]);
+  assert.deepEqual(filterBooks([comic,video],"同名","all","all",null,"comic").map(b=>b.id),[1]);
+});
+
 test("favorite and recent filters combine with search and distinguish unread from page one", () => {
   const books = [
     book(1, "故事1", true),

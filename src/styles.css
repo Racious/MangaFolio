@@ -1,6 +1,7 @@
 /* MangaFolio 全域樣式 —— 沉穩深色 × 金調，呼應開發文件風格。 */
 
 @import "./themes.css";
+@import "./layouts.css";
 :root {
   font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
   color: var(--text);
@@ -45,7 +46,7 @@ body {
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--accent-soft);
+  outline: 2px solid var(--focus, var(--accent-soft));
   outline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {

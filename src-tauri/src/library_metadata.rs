@@ -176,6 +176,9 @@ impl Library {
                     )
                     .optional()
                     .map_err(db_error)?;
+                if saved.as_ref().is_some_and(|book| book.format == "video") {
+                    return Err("影片由外部播放器開啟，請手動標記已看或未看。".into());
+                }
                 let status = saved
                     .as_ref()
                     .map(|book| {
@@ -375,12 +378,11 @@ pub struct ImportResult {
 #[tauri::command]
 pub async fn import_book_result(
     path: String,
-    library: State<'_, Library>,
+    app: tauri::AppHandle,
 ) -> Result<ImportResult, String> {
-    let opened = tauri::async_runtime::spawn_blocking(move || book::open(&path))
-        .await
-        .map_err(db_error)??;
-    let (book, created) = library.register_outcome(&opened.book, None)?;
+    use tauri::Manager;
+    let (book, created) = tauri::async_runtime::spawn_blocking(move || app.state::<Library>().import_source(&path))
+        .await.map_err(db_error)??;
     Ok(ImportResult {
         book,
         kind: if created { "added" } else { "updated" }.into(),

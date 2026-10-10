@@ -3,7 +3,7 @@ import {
   PhBooks,
   PhStar,
   PhClockCounterClockwise,
-  PhFolderNotchOpen,
+  PhFolderNotchOpen, PhGearSix, PhPlus, PhFunnel, PhSquaresFour, PhList, PhRows, PhMagnifyingGlass, PhQuestion,
 } from "@phosphor-icons/vue";
 import {
   computed, ref, watch, toRef, onMounted, onBeforeUnmount, nextTick,
@@ -16,21 +16,25 @@ import { filterBooks } from "../lib/library";
 import ContinueReading from "./ContinueReading.vue";
 import BookCard from "./BookCard.vue";
 import BookEditor from "./BookEditor.vue";
-import LibraryGuide from "./LibraryGuide.vue";
+
 import LibraryManager from "./LibraryManager.vue";
-import TagManager from "./TagManager.vue";
-import AppearanceSettings from "./AppearanceSettings.vue";
+import SettingsDialog from "./SettingsDialog.vue";
+import TutorialDialog from "./TutorialDialog.vue";
+import LibraryNavigation from "./LibraryNavigation.vue";
+
+import ImportPanel from "./ImportPanel.vue";
 import { useLibraryStore, type LibraryFilter } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 import { useAppearanceStore } from "../stores/appearance";
-import { pickBookFiles, type LibraryBook } from "../api/library";
+import { type LibraryBook } from "../api/library";
 import { sortBooks } from "../lib/library";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { assignSeries } from "../api/library";
-import { pickFolder } from "../api/backend";
 const library = useLibraryStore(),
   reader = useReaderStore(),
   appearance = useAppearanceStore();
+const newStyle = computed(() => ["workbench", "gallery", "studio"].includes(appearance.settings.style)
+  ? appearance.settings.style as "workbench" | "gallery" | "studio" : null);
 const limit = computed({
   get: () => (library.activeSeries ? library.seriesBookLimit : library.bookLimit),
   set: (value) => {
@@ -38,12 +42,25 @@ const limit = computed({
     else library.bookLimit = value;
   },
 });
-const guideTarget = ref(""),
-  managementOpen = ref(false),
+const managementOpen = ref(false),
   navigationOpen = ref(false);
+const settingsOpen = ref(false), addMenu = ref<HTMLDetailsElement>(), filterMenu = ref<HTMLDetailsElement>();
+const tutorialOpen = ref(false);
+function openTutorial() {
+  if (addMenu.value) addMenu.value.open = false;
+  if (filterMenu.value) filterMenu.value.open = false;
+  tutorialOpen.value = true;
+}
+function closeMenu(menu?: HTMLDetailsElement) { if (menu) { menu.open = false; menu.querySelector('summary')?.focus(); } }
+function dismissMenus(event: PointerEvent) {
+  for (const menu of [addMenu.value, filterMenu.value]) if (menu?.open && !menu.contains(event.target as Node)) menu.open = false;
+}
+function importFromMenu(mode: 'folders' | 'roots' | 'files' | 'rescan') { if (busy.value) return; if (addMenu.value) addMenu.value.open = false; settingsOpen.value = false; importMode.value = mode; }
+
 const selectedIds = toRef(library, "selectedIds"),
   editingBook = ref<LibraryBook | null>(null);
 const detailBook = ref<LibraryBook | null>(null);
+const importMode = ref<"folders" | "roots" | "files" | "rescan" | null>(null);
 const busy = computed(
   () =>
     library.managing ||
@@ -101,6 +118,7 @@ const query = computed({
   },
 });
 const groups = computed(() => groupSeries(library.books));
+const mediaBooks = computed(() => library.books.filter(b => library.mediaFilter === 'video' ? b.format === 'video' : library.mediaFilter === 'comic' ? b.format !== 'video' : true));
 const activeGroup = computed(() =>
   groups.value.find((g) => g.key === library.activeSeries),
 );
@@ -195,6 +213,7 @@ function resize() {
 }
 onMounted(() => {
   window.addEventListener("resize", resize);
+  window.addEventListener("pointerdown", dismissMenus);
   void restoreScroll();
 });
 onBeforeUnmount(() => {
@@ -202,14 +221,16 @@ onBeforeUnmount(() => {
   disposed = true;
   ++restoreGeneration;
   window.removeEventListener("resize", resize);
+  window.removeEventListener("pointerdown", dismissMenus);
 });
 watch(() => library.loading, (loading) => {
   if (!loading) void restoreScroll();
 }, { flush: "post" });
+watch(() => appearance.settings.style, () => { recordScroll(); void restoreScroll(); });
 const filters: { id: LibraryFilter; label: string }[] = [
-  { id: "all", label: "全部書籍" },
+  { id: "all", label: "全部作品" },
   { id: "favorites", label: "我的收藏" },
-  { id: "recent", label: "最近閱讀" },
+  { id: "recent", label: "最近開啟" },
   { id: "missing", label: "來源失效" },
 ];
 const sortedBooks = computed(() => {
@@ -220,6 +241,7 @@ const sortedBooks = computed(() => {
     library.filter,
     library.statusFilter,
     library.tagFilter,
+    library.mediaFilter,
   );
   return sort.value === "series"
     ? sortVolumes(books)
@@ -247,25 +269,11 @@ watch(
 );
 async function addFiles() {
   if (busy.value) return;
-  try {
-    const paths = await pickBookFiles();
-    if (paths?.length) await library.add(paths);
-  } catch (e) {
-    library.error = String(e);
-  }
-}
-async function addFolder() {
-  if (busy.value) return;
-  try {
-    const path = await pickFolder();
-    if (path) await library.add([path]);
-  } catch (e) {
-    library.error = String(e);
-  }
+  importMode.value = "files";
 }
 async function openBook(id: number) {
   if (busy.value) return;
-  if (await reader.openBook(id)) library.screen = "reader";
+  await library.openMedia(id);
 }
 function selectBook(id: number) {
   if (busy.value) return;
@@ -289,28 +297,33 @@ const resultLabels = {
 };
 </script>
 <template>
-  <main ref="layout" class="library-layout" @scroll="recordScroll">
-    <button
+  <main ref="layout" class="library-layout" :class="newStyle ? `layout-${newStyle}` : 'layout-classic'" @scroll="recordScroll">
+    <SettingsDialog v-if="settingsOpen" @close="settingsOpen = false" @import="importFromMenu" />
+    <TutorialDialog v-if="tutorialOpen" @close="tutorialOpen = false" />
+    <ImportPanel v-if="importMode" :mode="importMode" @close="importMode = null" />
+    <header v-if="newStyle === 'gallery'" class="top-navigation"><LibraryNavigation mode="gallery" :busy="busy" @settings="settingsOpen = true" /></header>
+    <aside v-else-if="newStyle" class="style-navigation" aria-label="書庫導覽"><LibraryNavigation :mode="newStyle" :busy="busy" @settings="settingsOpen = true" /></aside>
+    <button v-if="!newStyle"
       class="navigation-toggle"
       :aria-expanded="navigationOpen"
       @click="navigationOpen = !navigationOpen"
     >
       書庫導覽與設定
     </button>
-    <aside
+    <aside v-if="!newStyle"
       class="sidebar"
       :class="{ expanded: navigationOpen }"
       aria-label="書庫導覽與設定"
     >
       <div class="brand">
         <PhBooks :size="26" aria-hidden="true" /> MangaFolio<span
-          >你的私人漫畫書庫</span
+          >你的私人漫畫與影片收藏</span
         >
       </div>
       <nav aria-label="書庫篩選">
         <button
           :aria-pressed="library.section === 'series'"
-          :disabled="busy"
+          :disabled="busy || library.mediaFilter === 'video'"
           @click="
             library.section = 'series';
             library.activeSeries = null;
@@ -355,62 +368,26 @@ const resultLabels = {
             />{{ filter.label }}</span
           ><span>{{
             filter.id === "all"
-              ? library.books.length
+              ? mediaBooks.length
               : filter.id === "favorites"
                 ? library.favoriteCount
                 : filter.id === "recent"
                   ? library.recentCount
-                  : library.books.filter((b) => !b.available).length
+                  : mediaBooks.filter((b) => !b.available).length
           }}</span>
         </button>
       </nav>
-      <div
-        class="sidebar-section"
-        :class="{ 'guide-highlight': guideTarget === 'status' }"
-      >
-        <label
-          >閱讀狀態<select
-            aria-label="閱讀狀態"
-            v-model="library.statusFilter"
-            :disabled="library.managing"
-          >
-            <option value="all">全部狀態</option>
-            <option value="unread">未讀</option>
-            <option value="reading">閱讀中</option>
-            <option value="read">已讀</option>
-          </select></label
-        >
-        <label
-          >標籤篩選<select
-            aria-label="標籤篩選"
-            v-model="library.tagFilter"
-            :disabled="library.managing"
-          >
-            <option :value="null">全部標籤</option>
-            <option v-for="tag in library.tags" :key="tag.id" :value="tag.id">
-              {{ tag.name }}
-            </option>
-          </select></label
-        >
-        <TagManager />
-      </div>
-      <div
-        class="sidebar-section"
-        :class="{ 'guide-highlight': guideTarget === 'appearance' }"
-      >
-        <AppearanceSettings />
-      </div>
-      <p class="local-note">本機資料 · 無需帳號<br />原始漫畫檔案留在原位</p>
+      <button class="settings-entry" aria-label="開啟設定" @click="settingsOpen = true"><PhGearSix :size="20" aria-hidden="true" />設定</button>      <p class="local-note">本機資料 · 無需帳號<br />原始媒體檔案留在原位</p>
     </aside>
     <div
       ref="content"
       class="library-content"
-      :class="{ 'detail-open': detailBook }"
+      :class="{ 'detail-open': detailBook && newStyle !== 'gallery' }"
       @scroll="recordScroll"
     >
       <header class="library-header">
         <div>
-          <p class="eyebrow">
+          <p v-if="!newStyle" class="eyebrow">
             {{ managementOpen ? "整理你的收藏" : "收藏好故事，隨時接著讀" }}
           </p>
           <h1>
@@ -418,45 +395,45 @@ const resultLabels = {
               activeGroup?.name ??
               (library.section === "series"
                 ? "系列書架"
+                : library.filter === 'all' && library.mediaFilter === 'video' ? '影片收藏'
+                : library.filter === 'all' && library.mediaFilter === 'comic' ? '漫畫／圖集'
                 : filters.find((f) => f.id === library.filter)?.label)
             }}
           </h1>
+          <p v-if="newStyle" class="collection-caption">{{ sortedBooks.length }} 筆作品 · 你的私人收藏</p>
         </div>
         <div
           class="actions"
-          :class="{ 'guide-highlight': guideTarget === 'import' }"
+
         >
-          <button class="primary" :disabled="busy" @click="addFiles">
-            {{ library.importing ? "加入中…" : "加入 ZIP／CBZ" }}</button
-          ><button :disabled="busy" @click="addFolder">加入圖片資料夾</button
-          ><button
-            v-if="reader.hasBook"
-            :disabled="busy"
-            @click="library.screen = 'reader'"
-          >
-            返回閱讀</button
-          ><button
-            :disabled="busy"
-            :aria-expanded="managementOpen"
-            @click="managementOpen = !managementOpen"
-          >
-            {{ managementOpen ? "結束管理" : "管理與備份" }}
-          </button>
-        </div>
+          <button class="tutorial-entry" aria-label="開啟教學" @click="openTutorial"><PhQuestion :size="19" aria-hidden="true" />教學</button>
+          <button v-if="reader.hasBook" :disabled="busy" @click="library.screen = 'reader'">返回閱讀</button>
+          <button :disabled="busy" :aria-expanded="managementOpen" @click="managementOpen = !managementOpen">{{ managementOpen ? "完成管理" : "管理作品" }}</button>
+          <details ref="addMenu" class="add-menu" @keydown.esc.prevent="closeMenu(addMenu)">
+            <summary class="add-trigger" :aria-disabled="busy" @click="busy && $event.preventDefault()"><PhPlus :size="19" aria-hidden="true" />加入作品</summary>
+            <div class="add-options">
+              <button :disabled="busy" @click="importFromMenu('files')"><strong>漫畫／影片檔案</strong><span>可多選 ZIP、CBZ 與影片</span></button>
+              <button :disabled="busy" @click="importFromMenu('folders')"><strong>批次加入資料夾</strong><span>一次選取多個作品資料夾</span></button>
+              <button :disabled="busy" @click="importFromMenu('roots')"><strong>加入主目錄</strong><span>自動尋找各層子目錄的作品</span></button>
+            </div>
+          </details>        </div>
       </header>
       <div
         class="library-controls"
-        :class="{ 'guide-highlight': guideTarget === 'search' }"
+
       >
+        <div v-if="newStyle !== 'workbench' || narrow" class="view-switch media-switch" role="group" aria-label="媒體類型">
+          <button v-for="media in ['all', 'comic', 'video'] as const" :key="media" :disabled="busy" :aria-pressed="library.mediaFilter === media" @click="library.setMediaFilter(media)">{{ media === 'all' ? '全部' : media === 'comic' ? '漫畫／圖集' : '影片' }}</button>
+        </div>
         <label class="search"
-          ><span class="sr-only">搜尋書庫</span
+          ><PhMagnifyingGlass class="search-icon" :size="19" aria-hidden="true" /><span class="sr-only">搜尋書庫</span
           ><input
             v-model="query"
             type="search"
             :placeholder="
               library.activeSeries
                 ? '搜尋此系列…'
-                : '搜尋書名、系列、標籤或備註…'
+                : '搜尋作品名稱、系列、類別或備註…'
             "
             aria-label="搜尋書名"
             :disabled="library.managing"
@@ -466,26 +443,33 @@ const resultLabels = {
           aria-label="書籍排序"
           :disabled="library.managing"
         >
-          <option value="recent">最近閱讀／加入</option>
+          <option value="recent">最近開啟／加入</option>
           <option value="title">書名排序</option>
           <option value="series">系列／集數排序</option>
         </select>
+        <details ref="filterMenu" class="filter-menu"  @keydown.esc.prevent="closeMenu(filterMenu)">
+          <summary><PhFunnel :size="18" aria-hidden="true" />篩選<span v-if="library.tagFilter !== null || library.statusFilter !== 'all'" class="filter-dot" aria-label="篩選已套用"></span></summary>
+          <div class="filter-fields">
+            <label>{{ library.mediaFilter === 'video' ? '觀看狀態' : '閱讀／觀看狀態' }}<select v-model="library.statusFilter" aria-label="閱讀狀態" :disabled="busy"><option value="all">全部狀態</option><option value="unread">未讀／未看</option><option value="reading">閱讀中／觀看中</option><option value="read">已讀／已看</option></select></label>
+            <label>類別／標籤<select v-model="library.tagFilter" aria-label="標籤篩選" :disabled="busy"><option :value="null">全部類別</option><option v-for="tag in library.tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option></select></label>
+            <button :disabled="busy" @click="library.statusFilter = 'all'; library.tagFilter = null">清除篩選</button>
+          </div>
+        </details>
         <div class="view-switch" role="group" aria-label="書庫檢視切換">
           <button
             v-for="view in ['grid', 'detail', 'compact'] as const"
             :key="view"
+            :aria-label="view === 'grid' ? '封面網格' : view === 'detail' ? '詳細列表' : '緊湊列表'"
+            :title="view === 'grid' ? '封面網格' : view === 'detail' ? '詳細列表' : '緊湊列表'"
             :aria-pressed="appearance.settings.view === view"
             @click="appearance.set('view', view)"
           >
-            {{
-              view === "grid"
-                ? "封面網格"
-                : view === "detail"
-                  ? "詳細列表"
-                  : "緊湊列表"
-            }}
-          </button>
+            <component :is="view === 'grid' ? PhSquaresFour : view === 'detail' ? PhList : PhRows" :size="18" aria-hidden="true" />          </button>
         </div>
+      </div>
+      <div v-if="newStyle && (library.tagFilter !== null || library.statusFilter !== 'all')" class="active-filters" aria-label="已套用篩選">
+        <button v-if="library.tagFilter !== null" :disabled="busy" @click="library.tagFilter = null">{{ library.tags.find(tag => tag.id === library.tagFilter)?.name ?? '類別' }} · 清除</button>
+        <button v-if="library.statusFilter !== 'all'" :disabled="busy" @click="library.statusFilter = 'all'">{{ library.statusFilter === 'unread' ? '未讀／未看' : library.statusFilter === 'read' ? '已讀／已看' : '閱讀中／觀看中' }} · 清除</button>
       </div>
       <section v-if="library.activeSeries" class="series-heading">
         <button :disabled="busy" @click="backSeries">返回書架</button>
@@ -495,6 +479,7 @@ const resultLabels = {
             :id="activeGroup.cover.id"
             :available="activeGroup.cover.available"
             :title="activeGroup.name"
+            :revision="library.revision"
           />
           <div>
             <h2>{{ activeGroup.name }}</h2>
@@ -553,7 +538,7 @@ const resultLabels = {
       />
       <p v-if="library.error" class="notice error" role="alert">
         {{ library.error }}
-        <button :disabled="busy" @click="library.refresh">重新載入書庫</button>
+        <button :disabled="busy" @click="library.refresh()">重新載入書庫</button>
       </p>
       <p v-if="reader.error" class="notice error" role="alert">
         {{ reader.error }}
@@ -618,6 +603,7 @@ const resultLabels = {
       </section>
       <ContinueReading
         v-if="
+          (!newStyle || newStyle === 'gallery') &&
           library.continueBook &&
           library.filter === 'all' &&
           !library.query.trim() &&
@@ -632,7 +618,7 @@ const resultLabels = {
         @open="openBook"
       />
       <section
-        v-if="!library.activeSeries && !managementOpen && library.books.length"
+        v-if="!library.activeSeries && !managementOpen && library.books.length && library.mediaFilter !== 'video' && (!newStyle || library.section === 'series')"
         class="home-series"
       >
         <h2>{{ library.section === "series" ? "全部系列" : "我的系列" }}</h2>
@@ -660,10 +646,10 @@ const resultLabels = {
       </p>
       <p v-if="library.loading" class="status" role="status">正在載入書庫…</p>
       <section v-else-if="!library.books.length" class="empty">
-        <h2>把第一本漫畫加入書庫</h2>
-        <p>支援 ZIP、CBZ 與直接包含圖片的資料夾。收藏與進度儲存在這台電腦。</p>
+        <h2>把第一筆作品加入收藏</h2>
+        <p>支援 ZIP、CBZ、圖片資料夾與影片。可多選資料夾或選主目錄遞迴匯入。</p>
         <button class="primary" :disabled="busy" @click="addFiles">
-          加入漫畫
+          加入漫畫／影片
         </button>
       </section>
       <section v-else-if="!sortedBooks.length" class="empty">
@@ -676,7 +662,7 @@ const resultLabels = {
           library.section !== 'series' || library.activeSeries || managementOpen
         "
         ><p class="results" aria-live="polite">
-          {{ sortedBooks.length }} 本書{{ reader.loading ? " · 正在開啟…" : ""
+          {{ sortedBooks.length }} 筆作品{{ reader.loading ? " · 正在開啟…" : ""
           }}{{
             managementOpen
               ? ` · 已選 ${selectedIds.length} 本${hiddenSelectionCount ? `（包含 ${hiddenSelectionCount} 本未顯示的選取）` : ''}`
@@ -726,13 +712,15 @@ const resultLabels = {
         </button>
       </template>
       <footer>
-        <LibraryGuide @highlight="guideTarget = $event" />
+        <button class="help-entry" @click="settingsOpen = true">設定與使用說明</button>
         <p>閱讀狀態與續讀位置分開保存 · 來源失效不會自動移除書籍</p>
       </footer>
     </div>
     <BookDetailsPanel
       v-if="detailBook"
       :book="detailBook"
+      :presentation="newStyle === 'gallery' ? 'modal' : 'drawer'"
+      :compact="newStyle === 'studio'"
       @close="detailBook = null"
       @edit="
         editingBook = $event;
@@ -1126,4 +1114,21 @@ footer {
     white-space: normal;
   }
 }
+.settings-entry { display:flex; align-items:center; gap:10px; width:100%; background:transparent; border:0; text-align:left; }
+.add-menu, .filter-menu { position:relative; }
+.add-trigger { display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; background:var(--accent); color:var(--accent-ink); padding:10px 16px; border-radius:8px; font-size:14px; font-weight:600; }
+summary::-webkit-details-marker { display:none; }
+.add-trigger[aria-disabled=true] { opacity:.55; cursor:default; }
+.add-options { position:absolute; right:0; top:calc(100% + 8px); width:280px; z-index:20; padding:8px; border:1px solid var(--line); border-radius:12px; background:var(--panel); box-shadow:0 12px 36px #0003; }
+.add-options button { display:block; width:100%; text-align:left; padding:13px; border:0; background:transparent; }
+.add-options button:hover { background:var(--bg-soft); }
+.add-options strong { display:block; font-size:14px; }
+.add-options span { display:block; margin-top:5px; color:var(--text-dim); font-size:12px; }
+.filter-menu summary { display:flex; gap:7px; align-items:center; list-style:none; padding:9px 12px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:13px; }
+.filter-fields { position:absolute; right:0; top:calc(100% + 8px); z-index:20; width:260px; padding:18px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 36px #0003; display:grid; gap:16px; }
+.filter-fields label { display:grid; gap:8px; font-size:13px; }
+.filter-dot { width:7px; height:7px; background:var(--accent); border-radius:50%; }
+.search { position:relative; } .search input { padding-left:36px; } .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--text-dim); pointer-events:none; }
+.view-switch button { display:flex; align-items:center; justify-content:center; }
+.help-entry { border:0; background:transparent; color:var(--text-dim); }
 </style>

@@ -108,14 +108,14 @@ test("book-card interactions agree across grid/detail/compact and both modes", a
   globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
   try {
     await writeFile(`${directory}/stubs.mjs`, `
-      export const PhStar = () => null, PhPencilSimple = () => null;
+      export const PhStar = () => null, PhPencilSimple = () => null, PhPlay = () => null, PhBookOpen = () => null;
       export const loadCover = async () => null;
       export const progressPercent = () => 0;
-      export const statusLabels = { unread: '未讀' };
+      export const statusLabels = { unread: '未讀' }, videoStatusLabels = { unread: '未看' };
       export const displayPath = value => value ?? '';
     `);
     const Card = await compileComponent(directory, "BookCard", {
-      "@phosphor-icons/vue": "./stubs.mjs", "../api/covers": "./stubs.mjs", "../lib/library": "./stubs.mjs",
+      "@phosphor-icons/vue": "./stubs.mjs", "../api/covers": "./stubs.mjs", "../api/media": "./stubs.mjs", "../lib/library": "./stubs.mjs",
     });
     const renderer = makeRenderer();
     const click = async node => {
@@ -172,7 +172,7 @@ test("book-card interactions agree across grid/detail/compact and both modes", a
 test("library shows source recovery only for confirmed missing sources and preserves other error contexts", async () => {
   const directory = await mkdtemp(new URL("../.ux-test-", import.meta.url));
   const previousWindow = globalThis.window, previousFrame = globalThis.requestAnimationFrame;
-  globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, removeEventListener() {} };
+  globalThis.window = { matchMedia: () => ({ matches: true }), addEventListener() {}, removeEventListener() {} };
   globalThis.requestAnimationFrame = callback => setTimeout(callback, 0);
   let app;
   try {
@@ -186,22 +186,23 @@ test("library shows source recovery only for confirmed missing sources and prese
         importProgress: { results: [], completed: 0, total: 0 }, error: '', importNotice: '' });
       export const reader = reactive({ error: '壓縮檔損毀', missingBookId: null, hasBook: false });
       export const useLibraryStore = () => library, useReaderStore = () => reader;
-      export const useAppearanceStore = () => ({ settings: { view: 'grid' } });
+      export const useAppearanceStore = () => ({ settings: { style:'workbench', view: 'grid' } });
       export const pickBookFiles = async () => null, pickFolder = async () => null, ask = async () => false,
         assignSeries = async () => {};
-      export const PhBooks = () => null, PhStar = () => null, PhClockCounterClockwise = () => null, PhFolderNotchOpen = () => null;
+      export const PhBooks = () => null, PhStar = () => null, PhClockCounterClockwise = () => null, PhFolderNotchOpen = () => null, PhGearSix = () => null, PhPlus = () => null, PhFunnel = () => null, PhSquaresFour = () => null, PhList = () => null, PhRows = () => null, PhMagnifyingGlass = () => null, PhQuestion = () => null;
       export default { render: () => null };
     `);
     const replacements = { "@phosphor-icons/vue": "./stubs.mjs", "@tauri-apps/plugin-dialog": "./stubs.mjs",
-      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs", "../stores/library": "./stubs.mjs",
+      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs", "../api/media": "./stubs.mjs", "../stores/library": "./stubs.mjs",
       "../stores/reader": "./stubs.mjs", "../stores/appearance": "./stubs.mjs",
       "../lib/library": "./stubs.mjs", "../lib/series": "./stubs.mjs" };
     for (const name of ["BookDetailsPanel", "SeriesShelf", "BookCover", "ContinueReading", "BookCard", "BookEditor",
-      "LibraryGuide", "LibraryManager", "TagManager", "AppearanceSettings"]) replacements[`./${name}.vue`] = "./stubs.mjs";
+      "LibraryGuide", "LibraryManager", "TagManager", "AppearanceSettings", "ImportPanel", "SettingsDialog", "TutorialDialog", "LibraryNavigation"]) replacements[`./${name}.vue`] = "./stubs.mjs";
     const View = await compileComponent(directory, "LibraryView", replacements);
     const { library, reader } = await import(pathToFileURL(`${directory}/stubs.mjs`));
     const root = { children: [] };
     app = makeRenderer().createApp(View); app.mount(root);
+    assert.ok(find(root, node => node.props?.['aria-label'] === '媒體類型'), 'narrow workbench must retain its media switch');
     const recovery = () => find(root, node => node.type === "button" && textContent(node).includes("前往來源失效／重新指定"));
     for (const error of ["壓縮檔損毀", "收藏失敗", "頁面算繪失敗"]) {
       reader.error = error; await nextTick();
@@ -240,15 +241,16 @@ test("details switch without remounting, reject late covers/bookmarks, and adapt
       export const library = reactive({ books: [], favoritePending: new Set() });
       export const reader = reactive({});
       export const useLibraryStore = () => library, useReaderStore = () => reader;
-      export const progressPercent = () => 0, statusLabels = { unread: '未讀' };
+      export const progressPercent = () => 0, statusLabels = { unread: '未讀' }, videoStatusLabels = { unread: '未看' };
       export const displayPath = value => value;
       export const nextVolume = () => ({ reason: '沒有下一集' });
       export const covers = new Map(), bookmarks = new Map();
+      export const pickCover = async () => null, replaceCover = async () => {}, showSourceLocation = async () => {};
       export const loadCover = id => new Promise(resolve => covers.set(id, resolve));
       export const listBookmarks = id => new Promise(resolve => bookmarks.set(id, resolve));
       export const saveBookmark = async () => {}, deleteBookmark = async () => {};
     `);
-    const replacements = { "../api/covers": "./stubs.mjs", "../api/library": "./stubs.mjs",
+    const replacements = { "../api/covers": "./stubs.mjs", "../api/media": "./stubs.mjs", "../api/library": "./stubs.mjs",
       "../stores/library": "./stubs.mjs", "../stores/reader": "./stubs.mjs",
       "../lib/library": "./stubs.mjs", "../lib/series": "./stubs.mjs",
       "./BookCover.vue": "./BookCover.mjs", "./BookmarksPanel.vue": "./BookmarksPanel.mjs" };
@@ -309,14 +311,14 @@ test("manager explains relink restrictions and offers explicit pruning of hidden
       export const useLibraryStore = () => library;
       export const useReaderStore = () => reader;
       export let confirmation = ''; export const ask = async message => { confirmation = message; return false; };
-      export const open = async () => null, pickFolder = async () => null;
+      export const open = async () => null, pickFolder = async () => null, videoExtensions = ["mp4"];
       export const assignSeries = async () => {}, setReadingStatus = async () => {}, assignTag = async () => {},
         favoriteBooks = async () => {}, relinkBook = async () => {}, removeBooks = async () => {};
       export default { render: () => null };
     `);
     const Manager = await compileComponent(directory, "LibraryManager", {
       "./BackupPanel.vue": "./stubs.mjs", "@tauri-apps/plugin-dialog": "./stubs.mjs",
-      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs",
+      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs", "../api/media": "./stubs.mjs",
       "../stores/library": "./stubs.mjs", "../stores/reader": "./stubs.mjs",
     });
     const props = reactive({ selectedIds: [1, 2], shownCount: 1, hiddenCount: 1,
@@ -406,14 +408,14 @@ test("successful relink clears the matching missing error without discarding ano
       export const options = { confirm: true, path: 'isolated.cbz', fail: false };
       export const useLibraryStore = () => library, useReaderStore = () => reader;
       export const ask = async () => options.confirm, open = async () => options.path, pickFolder = open;
-      export const relinkBook = async () => { if (options.fail) throw Error('relink failed'); };
+      export const videoExtensions = ["mp4"]; export const relinkBook = async () => { if (options.fail) throw Error('relink failed'); };
       export const assignSeries = async () => {}, setReadingStatus = async () => {}, assignTag = async () => {},
         favoriteBooks = async () => {}, removeBooks = async () => {};
       export default { render: () => null };
     `);
     const Manager = await compileComponent(directory, "LibraryManager", {
       "./BackupPanel.vue": "./stubs.mjs", "@tauri-apps/plugin-dialog": "./stubs.mjs",
-      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs",
+      "../api/library": "./stubs.mjs", "../api/backend": "./stubs.mjs", "../api/media": "./stubs.mjs",
       "../stores/library": "./stubs.mjs", "../stores/reader": "./stubs.mjs",
     });
     const root = { children: [] };

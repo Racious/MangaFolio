@@ -14,7 +14,8 @@ test("appearance restores known settings and tolerates missing or corrupt storag
       '{"theme":"dark","view":"compact","density":"compact","coverSize":"large"}',
     ),
     {
-      style: "calm",
+      ...defaultAppearance,
+      style: "night",
       theme: "dark",
       view: "compact",
       density: "compact",
@@ -77,7 +78,7 @@ test("styles are independent from view and theme and old preferences gain defaul
   }
   assert.equal(
     parseAppearance('{"style":"unknown","view":"detail"}').style,
-    "calm",
+    "night",
   );
 });
 

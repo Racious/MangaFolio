@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { PhStar, PhPencilSimple } from "@phosphor-icons/vue";
+import { PhStar, PhPencilSimple, PhPlay, PhBookOpen } from "@phosphor-icons/vue";
 import { onMounted, onUnmounted, ref } from "vue";
 import { loadCover } from "../api/covers";
-import { progressPercent, statusLabels, displayPath } from "../lib/library";
+import { progressPercent, statusLabels, videoStatusLabels, displayPath } from "../lib/library";
 import type { LibraryBook } from "../api/library";
 
 const props = defineProps<{
@@ -35,7 +35,6 @@ function activateCover() {
   else if (!props.opening && props.book.available) emit("open", props.book.id);
 }
 onMounted(() => {
-  if (!props.book.available) return;
   observer = new IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
@@ -93,7 +92,7 @@ onUnmounted(() => {
     <button
       class="cover"
       :disabled="opening || (!selectable && !book.available)"
-      :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : `${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
+      :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : book.format === 'video' ? `使用預設播放器開啟：${book.title}` : `${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
       :aria-pressed="selectable ? !!selected : undefined"
       @click.stop="activateCover"
     >
@@ -103,13 +102,14 @@ onUnmounted(() => {
           !book.available
             ? "來源離線"
             : coverFailed
-              ? "無法載入封面"
+              ? "尚無可用封面"
               : "封面載入中"
         }}</small>
       </div>
-      <span class="format">{{
-        book.format === "folder" ? "資料夾" : "CBZ / ZIP"
+      <span class="format" :class="{ video: book.format === 'video' }">{{
+        book.format === "video" ? "影片" : book.format === "folder" ? "資料夾" : "CBZ / ZIP"
       }}</span>
+      <span v-if="!selectable && book.available" class="cover-action"><component :is="book.format === 'video' ? PhPlay : PhBookOpen" :size="19" aria-hidden="true" />{{ book.format === 'video' ? '預設播放器' : book.lastReadAt ? '繼續閱讀' : '開始閱讀' }}</span>
     </button>
     <div class="details">
       <h2 :title="book.title">{{ book.title }}</h2>
@@ -135,14 +135,15 @@ onUnmounted(() => {
         <span v-for="tag in book.tags" :key="tag.id">{{ tag.name }}</span>
       </p>
       <p class="reading-state">
-        {{ statusLabels[book.readingStatus]
+        {{ (book.format === 'video' ? videoStatusLabels : statusLabels)[book.readingStatus]
         }}{{ book.statusManual ? " · 手動標記" : "" }} ·
-        {{ progressPercent(book) }}%
+        {{ book.format === 'video' ? '外部播放器' : `${progressPercent(book)}%` }}
       </p>
       <p v-if="!book.available" class="offline-hint">
         來源無法存取 · 收藏與進度已保留
         <span class="source-path">{{ displayPath(book.path) }}</span>
       </p>
+      <p v-else-if="book.format === 'video'" class="page-count">{{ book.lastReadAt ? '曾開啟 · 點封面播放' : '點封面使用預設播放器' }}</p>
       <p v-else class="page-count">
         {{
           book.lastReadAt
@@ -151,7 +152,7 @@ onUnmounted(() => {
         }}
       </p>
       <div
-        v-if="book.lastReadAt"
+        v-if="book.lastReadAt && book.format !== 'video'"
         class="progress"
         role="img"
         :aria-label="`閱讀進度 ${book.lastIndex + 1} / ${book.pageCount} 頁`"
@@ -528,6 +529,7 @@ p {
 .grid .format {
   display: none;
 }
+.grid .format.video { display: block; }
 .grid .edit {
   display: inline-flex;
   align-items: center;

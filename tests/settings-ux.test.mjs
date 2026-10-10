@@ -1,0 +1,50 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import { nextTick } from "vue";
+import { makeRenderer, compileComponent, find, textContent } from "./vue-harness.mjs";
+const settle = async () => { for (let i = 0; i < 12; i++) await nextTick(); };
+test("settings keeps source errors recoverable, guards pending work and restores keyboard focus", async () => {
+  const directory = await mkdtemp(new URL("../.settings-test-", import.meta.url));
+  const previousDocument = globalThis.document;
+  let restored = false, app;
+  globalThis.document = { activeElement: { isConnected: true, focus: options => restored = options.preventScroll } };
+  try {
+    await writeFile(`${directory}/stubs.mjs`, `
+      import { reactive } from 'vue';
+      export const library = reactive({ favoritePending: new Set(), query:'保留搜尋', selectedIds:[2], notifySuccess:()=>{} });
+      export const backup = reactive({pending:false}), options={fails:true}, calls=[];
+      export const useLibraryStore=()=>library, useReaderStore=()=>({}), useBackupStore=()=>backup;
+      export const listRoots=async()=>['D:/Comic/2026'];
+      export const forgetRoot=async path=>{if(options.fails)throw Error('來源暫時離線');calls.push(path);};
+      export const displayPath=path=>path;
+      export default {render:()=>null};
+    `);
+    const replacements = Object.fromEntries(["../stores/library", "../stores/reader", "../stores/backup", "../api/media", "../lib/library", "./AppearanceSettings.vue", "./TagManager.vue", "./BackupPanel.vue", "./LibraryGuide.vue"].map(path => [path, "./stubs.mjs"]));
+    await compileComponent(directory, "LibraryGuide", {});
+    replacements["./LibraryGuide.vue"] = "./LibraryGuide.mjs";
+    const Settings = await compileComponent(directory, "SettingsDialog", replacements);
+    const stubs = await import(pathToFileURL(`${directory}/stubs.mjs`));
+    const root = {children:[]}; let closes = 0, mode;
+    app = makeRenderer().createApp(Settings, {onClose:()=>closes++, onImport:value=>mode=value}); app.mount(root); await settle();
+    const button = label => find(root, node => node.type === "button" && textContent(node) === label);
+    button("書庫來源").props.onClick(); await settle();
+    assert.match(textContent(root), /D:\/Comic\/2026/);
+    await button("忘記主目錄").props.onClick(); await settle();
+    assert.match(textContent(root), /無法忘記主目錄/);
+    assert.equal(stubs.calls.length, 0);
+    stubs.options.fails=false; await button("忘記主目錄").props.onClick(); await settle();
+    assert.deepEqual(stubs.calls, ["D:/Comic/2026"]);
+    button("加入主目錄").props.onClick(); assert.equal(mode, "roots");
+    stubs.backup.pending=true; await settle();
+    const close = find(root, node => node.props?.["aria-label"] === "關閉設定");
+    assert.equal(close.props.disabled, true);
+    find(root, node => node.type === "dialog").props.onCancel({preventDefault(){}}); assert.equal(closes, 0);
+    stubs.backup.pending=false; await settle(); close.props.onClick(); assert.equal(closes, 1);
+    button("使用說明").props.onClick(); await settle(); assert.equal(closes, 1, "mounting help must not close settings");
+    assert.ok(find(root, node => node.type === "button" && textContent(node).includes("開始教學")));
+    assert.equal(stubs.library.query, "保留搜尋"); assert.deepEqual(stubs.library.selectedIds, [2]);
+    app.unmount(); app=null; assert.equal(restored, true);
+  } finally { app?.unmount(); globalThis.document=previousDocument; await rm(directory, {recursive:true,force:true}); }
+});
