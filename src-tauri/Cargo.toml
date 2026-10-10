@@ -40,3 +40,6 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 fast_image_resize = "5"
 lru = "0.12"
 rusqlite = { version = "0.37", features = ["bundled", "backup"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
