@@ -108,8 +108,8 @@ async function automatic() {
   <details class="backup-panel">
     <summary>備份與還原</summary>
     <p>
-      備份 v3
-      包含書庫資訊、收藏、進度、偏好、標籤與書籤／筆記；不含漫畫來源、封面、外觀／工具列及本機自動備份設定。
+      備份 v4
+      包含漫畫與影片資訊、收藏、進度、偏好、標籤、書籤／筆記及人工封面（上限64 MiB）；不含原始媒體檔案、自動產生的封面、外觀／工具列、本機主目錄及自動備份設定。支援還原舊版 v1–v3。
     </p>
     <div class="panel-actions">
       <button :disabled="busy" @click="manual">匯出書庫備份</button

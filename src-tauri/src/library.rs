@@ -17,6 +17,12 @@ pub use reading::*;
 #[path = "library_safety.rs"]
 mod safety;
 pub use safety::*;
+#[path = "library_media.rs"]
+mod media;
+pub use media::*;
+#[path = "library_covers.rs"]
+mod covers;
+pub use covers::*;
 fn default_status() -> String {
     "unread".into()
 }
@@ -104,7 +110,7 @@ const COLUMNS: &str = "id, path, title, format, page_count, favorite, last_index
 fn db_error(e: impl std::fmt::Display) -> String {
     format!("書庫資料操作失敗：{e}")
 }
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -227,10 +233,10 @@ impl Library {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_error)?;
-        if version > 4 {
+        if version > 5 {
             return Err("書庫來自較新版本，請更新 MangaFolio；原始資料已保留。".into());
         }
-        if (1..=3).contains(&version) {
+        if (1..=4).contains(&version) {
             safety::upgrade_snapshot(&connection, directory)?;
         }
         connection
@@ -258,6 +264,9 @@ impl Library {
         }
         if version < 4 {
             safety::migrate(&mut connection, directory)?;
+        }
+        if version < 5 {
+            media::migrate(&mut connection)?;
         }
         let covers = directory.join("covers");
         std::fs::create_dir_all(&covers).map_err(db_error)?;
@@ -447,6 +456,8 @@ impl Library {
     pub fn cover(&self, id: i64) -> Result<Vec<u8>, String> {
         let _guard = self.cover_lock.lock().map_err(db_error)?;
         let entry = self.get(id)?;
+        if let Some(bytes) = self.custom_cover(id)? { return Ok(bytes); }
+        if entry.format == "video" { return self.video_cover(id, Path::new(&entry.path)); }
         let opened = book::open(&entry.path)?;
         let source = Path::new(&entry.path);
         let first = if source.is_dir() {
@@ -502,6 +513,8 @@ pub struct LibraryBackup {
     pub books: Vec<LibraryBook>,
     #[serde(default)]
     pub bookmarks: Vec<Bookmark>,
+    #[serde(default)]
+    pub custom_covers: Vec<CustomCover>,
 }
 
 #[derive(Serialize)]
@@ -511,7 +524,7 @@ pub struct RestoreResult {
     pub skipped: usize,
 }
 
-const MAX_BACKUP_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_BACKUP_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_BACKUP_BOOKS: usize = 10_000;
 
 impl Library {
@@ -575,6 +588,9 @@ impl Library {
                 row_book,
             )
             .map_err(db_error)?;
+        if saved.format == "video" {
+            return Err("影片來源不能改成漫畫。".into());
+        }
         let duplicate = source_id(&transaction, &path, Some(id))?;
         if duplicate.is_some() {
             return Err("這個來源已在書庫中，請選擇其他來源。".into());
@@ -613,14 +629,15 @@ impl Library {
         }
         let bytes = serde_json::to_vec_pretty(&LibraryBackup {
             application: "MangaFolio".into(),
-            version: 3,
+            version: 4,
             tags,
             books,
             bookmarks: reading::bookmarks_from(&connection, None)?,
+            custom_covers: covers::custom_covers_from(&connection)?,
         })
         .map_err(db_error)?;
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
-            return Err("備份超過 16 MiB，無法匯出。".into());
+            return Err("備份超過 64 MiB，無法匯出；原始資料與封面已保留。".into());
         }
         connection.commit().map_err(db_error)?;
         Ok(bytes)
@@ -667,7 +684,7 @@ impl Library {
 
     fn parse_backup(bytes: &[u8]) -> Result<LibraryBackup, String> {
         if bytes.len() as u64 > MAX_BACKUP_BYTES {
-            return Err("備份超過 16 MiB。".into());
+            return Err("備份超過 64 MiB。".into());
         }
         // Read the version before strict payload parsing so future fields still
         // yield an explicit version error rather than a generic format error.
@@ -677,13 +694,13 @@ impl Library {
         }
         let header: BackupHeader =
             serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
-        if header.version > 3 {
+        if header.version > 4 {
             return Err("不支援較新的備份版本，未還原任何項目。".into());
         }
         let mut backup: LibraryBackup =
             serde_json::from_slice(bytes).map_err(|_| "備份格式無效。".to_string())?;
         if backup.application != "MangaFolio"
-            || ![1, 2, 3].contains(&backup.version)
+            || ![1, 2, 3, 4].contains(&backup.version)
             || backup.books.len() > MAX_BACKUP_BOOKS
         {
             return Err("不支援的備份格式、版本或書籍數量。".into());
@@ -702,6 +719,9 @@ impl Library {
         }
         let mut paths = std::collections::HashSet::new();
         for book in &mut backup.books {
+            if book.format == "video" && (book.page_count != 1 || book.last_index != 0 || book.last_page_name.is_some()) {
+                return Err("備份影片資料無效，不支援漫畫頁碼或進度。".into());
+            }
             if backup.version == 1 {
                 book.source_title = book.title.clone();
                 book.custom_title.clear();
@@ -754,7 +774,7 @@ impl Library {
                 || book.path.len() > 32_768
                 || book.title.is_empty()
                 || book.title.len() > 4096
-                || !["folder", "cbz"].contains(&book.format.as_str())
+                || !["folder", "cbz", "video"].contains(&book.format.as_str())
                 || book.page_count == 0
                 || book.page_count > 1_000_000
                 || book.last_index >= book.page_count
@@ -769,6 +789,7 @@ impl Library {
             }
         }
         reading::validate_backup_bookmarks(&backup)?;
+        covers::validate_covers(&backup)?;
         Ok(backup)
     }
 
@@ -811,6 +832,7 @@ impl Library {
         let mut existing_keys: std::collections::HashSet<String> =
             stored_paths.iter().map(|p| source_key(p)).collect();
         let mut bookmark_map = std::collections::HashMap::<i64, Vec<&Bookmark>>::new();
+        let cover_map: std::collections::HashMap<_,_> = backup.custom_covers.iter().map(|c|(c.book_id,&c.data)).collect();
         for bookmark in &backup.bookmarks {
             bookmark_map
                 .entry(bookmark.book_id)
@@ -830,6 +852,9 @@ impl Library {
             let added = transaction.execute("INSERT INTO books(path,title,format,page_count,favorite,last_index,last_page_name,last_read_at,preferences,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(path) DO NOTHING", params![book.path, book.source_title, book.format, book.page_count, book.favorite, book.last_index, book.last_page_name, book.last_read_at, preferences, now()]).map_err(db_error)?;
             if added == 1 {
                 let id = transaction.last_insert_rowid();
+                if let Some(data) = cover_map.get(&book.id) {
+                    transaction.execute("INSERT INTO custom_covers(book_id,data) VALUES(?1,?2)",params![id,data]).map_err(db_error)?;
+                }
                 transaction.execute("UPDATE books SET custom_title=?1,series=?2,volume=?3,notes=?4,reading_status=?5,status_manual=?6 WHERE id=?7",params![book.custom_title.trim(),book.series.trim(),book.volume.trim(),book.notes,book.reading_status,book.status_manual,id]).map_err(db_error)?;
                 for bookmark in bookmark_map.get(&book.id).into_iter().flatten() {
                     reading::insert_bookmark(&transaction, id, bookmark)?;
@@ -895,8 +920,7 @@ pub async fn relink_library_book(
 ) -> Result<LibraryBook, String> {
     use tauri::Manager;
     tauri::async_runtime::spawn_blocking(move || {
-        let opened = book::open(&path)?;
-        app.state::<Library>().relink(id, &opened.book)
+        app.state::<Library>().relink_source(id, &path)
     })
     .await
     .map_err(db_error)?
@@ -1098,6 +1122,7 @@ mod tests {
         b.preferences.page_mode = "double".into();
         let backup = LibraryBackup {
             bookmarks: vec![],
+            custom_covers: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: vec![],
@@ -1251,6 +1276,7 @@ mod tests {
             .collect();
         let backup = LibraryBackup {
             bookmarks: vec![],
+            custom_covers: vec![],
             application: "MangaFolio".into(),
             version: 2,
             tags: vec![],
@@ -1355,7 +1381,7 @@ mod tests {
                 .unwrap()
                 .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            4
+            5
         );
     }
 
@@ -1535,7 +1561,7 @@ mod tests {
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .is_err());
         assert_eq!(library.backup_json().unwrap(), before);
-        backup.version = 4;
+        backup.version = 5;
         assert!(library
             .restore_json(&serde_json::to_vec(&backup).unwrap())
             .is_err());
@@ -1659,6 +1685,7 @@ mod tests {
         entry.path = r"Z:\mangafolio-missing\pages".into();
         let mut backup = LibraryBackup {
             bookmarks: vec![],
+            custom_covers: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: Vec::new(),
@@ -1878,7 +1905,7 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch("PRAGMA user_version=5")
+            .execute_batch("PRAGMA user_version=6")
             .unwrap();
         drop(library);
         assert!(f.library_result().is_err());
@@ -1984,6 +2011,7 @@ mod tests {
         entries[1].preferences.zoom = "bad".into();
         let backup = LibraryBackup {
             bookmarks: vec![],
+            custom_covers: vec![],
             application: "MangaFolio".into(),
             version: 1,
             tags: Vec::new(),
@@ -2007,8 +2035,9 @@ mod tests {
         let entry = library.register(&f.book()).unwrap();
         let mut backup = LibraryBackup {
             bookmarks: vec![],
+            custom_covers: vec![],
             application: "MangaFolio".into(),
-            version: 4,
+            version: 5,
             tags: Vec::new(),
             books: vec![entry.clone()],
         };

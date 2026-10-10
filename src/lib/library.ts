@@ -1,6 +1,8 @@
 import type { LibraryBook, ReadingStatus } from "../api/library";
 
 export type LibraryFilter = "all" | "favorites" | "recent" | "missing";
+export type MediaFilter = "all" | "comic" | "video";
+export const videoStatusLabels = { unread: "未看", reading: "觀看中", read: "已看" };
 export const statusLabels = { unread: "未讀", reading: "閱讀中", read: "已讀" };
 export function progressPercent(book: LibraryBook): number {
   return book.lastReadAt === null
@@ -16,10 +18,12 @@ export function filterBooks(
   filter: LibraryFilter,
   status: ReadingStatus | "all" = "all",
   tagId: number | null = null,
+  media: MediaFilter = "all",
 ): LibraryBook[] {
   const term = query.trim().normalize("NFKC").toLocaleLowerCase();
   return books.filter(
     (book) =>
+      (media === "all" || (media === "video" ? book.format === "video" : book.format !== "video")) &&
       (filter !== "favorites" || book.favorite) &&
       (filter !== "recent" || book.lastReadAt !== null) &&
       (filter !== "missing" || !book.available) &&

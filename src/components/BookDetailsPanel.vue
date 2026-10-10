@@ -5,9 +5,11 @@ import BookmarksPanel from "./BookmarksPanel.vue";
 import type { LibraryBook } from "../api/library";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
-import { progressPercent, statusLabels, displayPath } from "../lib/library";
+import { progressPercent, statusLabels, videoStatusLabels, displayPath } from "../lib/library";
 import { nextVolume } from "../lib/series";
-const props = defineProps<{ book: LibraryBook }>();
+import { pickCover, replaceCover, showSourceLocation } from "../api/media";
+import { PhFolderNotchOpen } from "@phosphor-icons/vue";
+const props = defineProps<{ book: LibraryBook; presentation?: "modal" | "drawer"; compact?: boolean }>();
 const emit = defineEmits<{
   close: [];
   edit: [book: LibraryBook];
@@ -20,6 +22,15 @@ const book = computed(
   () => library.books.find((b) => b.id === props.book.id) ?? props.book,
 );
 const next = computed(() => nextVolume(book.value, library.books));
+const sourceError = ref("");
+async function showSource() {
+  if (busy.value) return;
+  library.managing = true;
+  sourceError.value = "";
+  try { await showSourceLocation(book.value.id); }
+  catch (e) { sourceError.value = String(e); }
+  finally { library.managing = false; }
+}
 const busy = computed(
   () =>
     library.managing ||
@@ -38,7 +49,7 @@ function updateMode() {
   const active = document.activeElement as HTMLElement | null;
   const switching = panel.open;
   panel.close();
-  modal.value = !wideScreen.matches;
+  modal.value = props.presentation === "modal" || !wideScreen.matches;
   if (modal.value) panel.showModal();
   else panel.show();
   if (switching && active?.isConnected) active.focus({ preventScroll: true });
@@ -51,8 +62,10 @@ function escape(event: KeyboardEvent) {
   emit("close");
 }
 watch(() => book.value.id, () => {
+  sourceError.value = "";
   if (dialog.value) dialog.value.scrollTop = 0;
 }, { flush: "post" });
+watch(() => props.presentation, updateMode, { flush: "post" });
 onMounted(() => {
   focus = document.activeElement as HTMLElement;
   updateMode();
@@ -66,23 +79,38 @@ onUnmounted(() => {
 });
 async function read(id: number) {
   if (busy.value) return;
-  if (await reader.openBook(id)) {
-    library.screen = "reader";
+  if (await library.openMedia(id)) {
     emit("close");
   }
+}
+async function changeCover() {
+  if (busy.value) return;
+  const id = book.value.id;
+  library.managing = true;
+  library.error = "";
+  try {
+    const path = await pickCover();
+    if (!path) return;
+    await reader.flushProgress();
+    await replaceCover(id, path);
+    await library.refresh();
+    library.notifySuccess("封面已更新，原始媒體檔案保留。");
+  } catch (e) { library.error = String(e); }
+  finally { library.managing = false; }
 }
 </script>
 <template>
   <dialog
     ref="dialog"
     class="detail-panel"
+    :class="{ 'centered-detail': presentation === 'modal' }"
     role="dialog"
     :aria-modal="modal"
     aria-labelledby="book-detail-title"
     @cancel="busy ? $event.preventDefault() : emit('close')"
   >
     <header>
-      <span>書籍詳情</span
+      <span>{{ book.format === 'video' ? '影片詳情' : '書籍詳情' }}</span
       ><button
         autofocus
         :disabled="busy"
@@ -97,51 +125,62 @@ async function read(id: number) {
       :id="book.id"
       :available="book.available"
       :title="book.title"
+      :revision="library.revision"
     />
     <h2 id="book-detail-title">{{ book.title }}</h2>
+    <p v-if="compact" class="compact-overview">{{ book.format === 'video' ? '影片 · 系統預設播放器' : `漫畫／圖集 · ${book.pageCount} 頁` }}<br />{{ (book.format === 'video' ? videoStatusLabels : statusLabels)[book.readingStatus] }}{{ book.tags.length ? ` · ${book.tags.map(tag => tag.name).join('、')}` : '' }}</p>
+    <details class="extra-info" :open="!compact"><summary v-if="compact">更多作品資訊</summary>
     <dl>
       <dt>系列／集數</dt>
       <dd>
         {{ book.series || "未分系列"
         }}{{ book.volume ? ` · 第 ${book.volume} 集` : "" }}
       </dd>
-      <dt>閱讀狀態</dt>
+      <dt>{{ book.format === 'video' ? '觀看狀態' : '閱讀狀態' }}</dt>
       <dd>
-        {{ statusLabels[book.readingStatus]
+        {{ (book.format === 'video' ? videoStatusLabels : statusLabels)[book.readingStatus]
         }}{{ book.statusManual ? "（手動）" : "" }}
       </dd>
-      <dt>頁面進度</dt>
-      <dd>
+      <dt v-if="book.format !== 'video'">頁面進度</dt>
+      <dd v-if="book.format !== 'video'">
         {{ progressPercent(book) }}% ·
         {{ book.lastReadAt ? book.lastIndex + 1 : 0 }}／{{ book.pageCount }} 頁
       </dd>
+      <dt v-if="book.format === 'video'">最近開啟</dt>
+      <dd v-if="book.format === 'video'">{{ book.lastReadAt ? new Date(book.lastReadAt).toLocaleString() : '尚未開啟' }}<br />由系統預設播放器播放，觀看狀態可在管理中手動標記。</dd>
       <dt>標籤</dt>
       <dd>{{ book.tags.map((t) => t.name).join("、") || "無標籤" }}</dd>
       <dt>來源</dt>
       <dd>
         {{ book.available ? "可存取" : "來源失效；資料保留"
-        }}<span class="path">{{ displayPath(book.path) }}</span>
+        }}<div class="source-location"><span class="path">{{ displayPath(book.path) }}</span><button class="source-button" :disabled="busy" aria-label="在檔案總管中顯示" title="在檔案總管中顯示" @click="showSource"><PhFolderNotchOpen :size="20" aria-hidden="true" /></button></div>
+        <p v-if="sourceError" class="source-error" role="alert">{{ sourceError }}</p>
       </dd>
     </dl>
     <p class="note">{{ book.notes || "尚無備註。" }}</p>
+    </details>
     <div class="panel-actions">
       <button
         class="primary"
         :disabled="busy || !book.available"
         @click="read(book.id)"
       >
-        閱讀</button
+        {{ book.format === 'video' ? '使用預設播放器開啟' : '閱讀' }}</button
       ><button
         :disabled="busy"
         :aria-pressed="book.favorite"
         @click="library.toggleFavorite(book)"
       >
         {{ book.favorite ? "取消收藏" : "收藏" }}</button
+      ><button v-if="compact" :disabled="busy" @click="changeCover">更換封面</button
       ><button :disabled="busy" @click="emit('edit', book)">編輯資訊</button
       ><button :disabled="busy" @click="emit('manage', book)">
         重新連結／管理
       </button>
     </div>
+    <p v-if="(modal || compact) && library.error" :role="modal ? 'alert' : undefined">{{ library.error }}</p>
+    <p v-if="(modal || compact) && library.importNotice" :role="modal ? 'status' : undefined">{{ library.importNotice }}</p>
+    <details v-if="book.format !== 'video'" class="reading-extras" :open="!compact"><summary v-if="compact">下一集與書籤</summary>
     <section class="next-volume">
       <h3>下一集</h3>
       <p>{{ next.reason }}</p>
@@ -154,6 +193,7 @@ async function read(id: number) {
       </button>
     </section>
     <BookmarksPanel :key="book.id" :book-id="book.id" @opened="emit('close')" />
+    </details>
   </dialog>
 </template>
 <style scoped>
@@ -211,6 +251,10 @@ dd {
   font-size: 11px;
   color: var(--text-dim);
 }
+.source-location { display: flex; align-items: center; gap: 8px; }
+.source-location .path { flex: 1; min-width: 0; }
+.source-button { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 6px; flex-shrink: 0; }
+.source-error { color: var(--red); font-size: 12px; margin: 8px 0 0; }
 .note {
   white-space: pre-wrap;
   line-height: 1.8;

@@ -1,64 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+const props = defineProps<{ embedded?: boolean; standalone?: boolean }>();
 
-const emit = defineEmits<{ highlight: [target: string] }>();
-const steps = [
-  { target:"books",title:"系列書架與下一集",text:"管理模式可批次指定系列；點系列封面查看全部集數，返回保留首頁搜尋。書籍詳情集中編輯、重新連結與書籤。",check:"最後跨頁可選閱讀下一集；缺值、重複、特殊集數或跳號須自行選書，來源失效不跳過。" },
-  { target:"management",title:"安全備份與書籤",text:"閱讀器可標記雙頁其中一頁，純文字筆記依頁名定位。備份含書籤，不含漫畫／封面／外觀；還原前先預覽，確認後重新驗證。",check:"升級前先保存 SQLite 一致性快照；自動備份可開關及設定保留數量。" },
-  {
-    target: "appearance",
-    title: "選擇自己的介面",
-    text: "外觀設定提供靜謐書架、目錄工作台與夜讀書房；每種風格都可切換三種檢視、明暗主題、密度與封面尺寸。",
-    check: "切換不會重設搜尋、篩選、排序或有效選取；選擇會保存在這台電腦。",
-  },
-  {
-    target: "status",
-    title: "閱讀狀態與標籤",
-    text: "未讀、閱讀中、已讀可搭配搜尋、收藏與標籤。管理模式可批次標記狀態及加入／移除標籤；管理標籤可建立、重新命名及刪除。",
-    check: "手動標記不清除續讀位置；選「依進度判定」可恢復自動狀態。",
-  },
-  {
-    target: "books",
-    title: "編輯書籍資訊",
-    text: "點書籍的「查看資訊」，再選「編輯資訊」設定自訂書名、系列、集數與備註。原始來源名稱另行顯示，來源檔案不會更名。",
-    check: "重新加入、開書或重新指定來源後，自訂資訊仍保留。",
-  },
-  {
-    target: "management",
-    title: "批次匯入與備份",
-    text: "多選 ZIP／CBZ 後可查看逐筆結果、停止未開始項目並重試失敗項目。管理與備份包含收藏、閱讀狀態、標籤、自訂資訊及進度，不含漫畫檔案。",
-    check: "來源失效入口可查看路徑並選取一本重新指定來源；衝突不會自動合併。",
-  },
-  {
-    target: "import",
-    title: "加入第一本漫畫",
-    text: "點「＋ 加入 ZIP／CBZ」選取一本或多本漫畫；也可以加入直接包含圖片的資料夾。原始檔案會留在原位。",
-    check: "加入後，下方會出現封面卡片。",
-  },
-  {
-    target: "books",
-    title: "從封面開始閱讀",
-    text: "點封面後圖片使用完整閱讀區域。滑鼠移到上、下邊緣會顯示工具列；Esc 可顯示或隱藏，鍵盤 Tab 或觸控「工具列」也能操作。上方「書庫」可返回。",
-    check: "回到書庫後，卡片會顯示頁碼與閱讀進度。",
-  },
-  {
-    target: "favorites",
-    title: "收藏喜歡的作品",
-    text: "點書籍卡片的 ☆，變成 ★ 就代表已收藏。再點「我的收藏」查看；閱讀工具列也可以切換收藏。",
-    check: "再次點星號可取消收藏，收藏數量會同步更新。",
-  },
-  {
-    target: "search",
-    title: "搜尋與排序書籍",
-    text: "在「搜尋書名…」輸入部分書名，再選「書名排序」或「最近閱讀／加入」。搜尋也能搭配收藏與最近閱讀篩選。",
-    check: "支援大小寫與全形／半形；清除搜尋可恢復顯示。",
-  },
-  {
-    target: "recent",
-    title: "接著上次的進度讀",
-    text: "先開一本書、翻到其他頁，再返回書庫。首頁的「繼續閱讀」會帶你回到上次位置，「最近閱讀」則列出讀過的書。",
-    check: "正常關閉再開啟，收藏、進度與閱讀設定仍會保留在這台電腦。",
-  },
+const emit = defineEmits<{ highlight: [target: string]; complete: [] }>();
+const guide = ref<HTMLElement>();
+interface GuideTask { title: string; instructions: string[]; image?: string; caption?: string }
+const steps: { target: string; title: string; tasks: GuideTask[]; check: string }[] = [
+  { target: 'import', title: '加入漫畫與影片', tasks: [{ title: '加入一筆作品', instructions: ['回到書庫，點「加入作品」。', '選「漫畫／影片檔案」加入 ZIP、CBZ 或影片；圖片資料夾則選「批次加入資料夾」。', '選取來源；若出現匯入預覽，確認勾選項目後按「匯入所選」。'] }], check: '書庫出現作品封面；原始檔案仍留在原位。' },
+  { target: 'books', title: '從封面開始閱讀', tasks: [{ title: '開啟與返回', instructions: ['點漫畫封面進入閱讀器；點影片封面會開啟系統預設播放器。', '漫畫用方向鍵翻頁。將滑鼠移到畫面上緣或下緣，或按 Esc 顯示工具列。', '點工具列的「書庫」返回；影片則關閉播放器，回到 MangaFolio。'] }], check: '漫畫卡片顯示閱讀進度；影片不會自動取得播放器的觀看進度。' },
+  { target: 'favorites', title: '收藏喜歡的作品', tasks: [{ title: '加入收藏', instructions: ['找到想收藏的作品，點卡片上的星號。', '在書庫導覽選「我的收藏」（部分介面顯示「收藏」）。', '想取消收藏時，再點一次該作品的星號。'] }], check: '星號亮起代表已收藏；收藏清單會同步更新。' },
+  { target: 'search', title: '搜尋與排序書籍', tasks: [{ title: '找出需要的作品', instructions: ['在書庫搜尋欄輸入部分作品名稱、系列、類別或備註。', '在排序選單選「書名排序」、「最近開啟／加入」或「系列／集數排序」。', '要看全部作品，清空搜尋文字，並清除已套用的篩選。'] }], check: '只顯示符合條件的作品；排序改變不會移除書庫紀錄。' },
+  { target: 'recent', title: '接著上次的進度讀', tasks: [{ title: '續讀漫畫', instructions: ['先開一本漫畫，翻到想停下來的頁面，再返回書庫。', '在「繼續閱讀」點該作品；也可從「最近開啟」（部分介面顯示「最近」）找到它。', '讀完後再返回書庫，保存新的進度。'] }], check: '下次開啟同一本漫畫會回到上次位置；影片由外部播放器處理續播。' },
+  { target: 'books', title: '系列書架與下一集', tasks: [{ title: '整理同一系列', instructions: ['點「管理作品」，勾選同一系列的漫畫。', '在「批次系列」輸入系列名稱，按「指定系列」；再逐本「編輯資訊」填寫集數。', '回到書庫，在系列書架點系列封面查看各集；作品資訊的「下一集」可開啟下一本。'] }], check: '漫畫依系列與集數整理。缺值、重複或跳號時，請自行選擇下一本。' },
+  { target: 'status', title: '閱讀狀態與標籤', tasks: [
+    { title: '先建立標籤', instructions: ['關閉教學，點「設定」→「類別與標籤」。', '在「標籤名稱」輸入一個名稱，例如「科幻」（1–64 字）。', '按「建立標籤」，確認「現有標籤」選單已出現它，再關閉設定。'], image: '/guide/create-tag.jpg', caption: '建立標籤：設定 → 類別與標籤 → 輸入名稱 → 建立標籤' },
+    { title: '再把標籤加到作品', instructions: ['回到書庫，點「管理作品」，勾選一本或多本作品。', '在「選擇標籤」選單選剛建立的「科幻」，按「批次加入標籤」。', '結束管理後，從「類別／標籤」篩選該標籤，確認這些作品出現在清單。'], image: '/guide/assign-tag.jpg', caption: '套用標籤：管理作品 → 勾選作品 → 選擇標籤 → 批次加入標籤' },
+    { title: '手動調整閱讀／觀看狀態', instructions: ['在「管理作品」勾選要調整的作品。', '點「標記已讀」或「標記未讀」；選到影片時，按鈕會顯示「已讀／已看」或「未讀／未看」。', '漫畫要恢復自動狀態，按「依進度判定」；影片請手動標記。'] },
+  ], check: '建立標籤後仍需套用到作品；多個標籤逐一加入即可。移除用「批次移除標籤」，手動改狀態不清除續讀位置。' },
+  { target: 'books', title: '編輯書籍資訊', tasks: [{ title: '修改顯示資訊', instructions: ['點作品名稱，開啟作品資訊。', '點「編輯資訊」，填入自訂書名、系列、集數或備註。', '按「保存資訊」，確認書庫顯示更新後的內容。'] }], check: '只變更書庫顯示資訊，來源檔案不會更名。標籤請使用「管理作品」設定。' },
+  { target: 'books', title: '找到原始檔案與安全移除', tasks: [
+    { title: '開啟來源目錄', instructions: ['點作品名稱，開啟作品資訊；資訊書架可先展開「更多作品資訊」。', '找到「來源」，點路徑旁的資料夾圖示。', '檔案總管開啟圖片資料夾，或選取 ZIP、CBZ、影片檔案。'], image: '/guide/source-location.jpg', caption: '來源目錄：作品資訊 → 來源路徑旁的資料夾按鈕' },
+    { title: '從書庫移除', instructions: ['點「管理作品」，勾選要移除的作品。', '點「移除所選」，閱讀確認視窗列出的移除範圍。', '確認後移除書庫紀錄；若要保留進度等資訊，請先匯出備份。'] },
+  ], check: '移除所選不會刪除原始檔案，但會移除該作品的收藏、進度、標籤關聯、書籤及自訂資訊。' },
+  { target: 'management', title: '批次匯入與備份', tasks: [{ title: '一次加入多筆作品', instructions: ['點「加入作品」→「批次加入資料夾」；要遞迴掃描整個資料夾樹，選「加入主目錄」。', '在預覽清單確認路徑與警告，勾選要加入的作品，再按「匯入所選」。', '主目錄後續新增作品時，點「設定」→「書庫來源」，重新掃描已加入的主目錄。'] }], check: '匯入完成後，書庫會出現新作品；來源失效時選取一本，使用「重新指定來源」或「重新指定影片」。備份操作見下一個主題。' },
+  { target: 'management', title: '安全備份與書籤', tasks: [
+    { title: '匯出與還原備份', instructions: ['點「設定」→「資料與備份」，展開「備份與還原」。', '點「匯出書庫備份」，選儲存位置；原始漫畫與影片請另外保管。', '需要還原時，點「還原書庫備份」，選備份檔，檢查預覽後再確認。'] },
+    { title: '在漫畫加書籤', instructions: ['開啟漫畫，翻到想記下來的頁面。', '顯示閱讀工具列，點「書籤／筆記」，輸入名稱與筆記；雙頁時先選要標記的頁面。', '按「新增書籤」；之後從書籤清單點名稱即可回到該頁。'] },
+  ], check: '書庫備份包含收藏、進度、標籤、書籤與人工封面；不含原始媒體、自動封面、外觀及本機主目錄。' },
+  { target: 'appearance', title: '選擇自己的介面', tasks: [{ title: '調整外觀', instructions: ['點「設定」→「外觀與閱讀」。', '選喜歡的介面、配色與明暗；再調整密度、封面尺寸。', '關閉設定，回到書庫查看效果；不喜歡時再回來更換。'] }], check: '外觀選擇保存在這台電腦，切換介面會保留搜尋、篩選、排序與有效選取。' },
 ];
 function readSetting(key: string) {
   try {
@@ -75,24 +44,28 @@ function saveSetting(key: string, value: string) {
   }
 }
 const visible = ref(
-  readSetting("mangafolio.library-guide.v1.hidden") === "false",
+  props.standalone || readSetting("mangafolio.library-guide.v1.hidden") === "false",
 );
 const savedIndex = Number(readSetting("mangafolio.library-guide.v1.step"));
 const index = ref(
-  Number.isInteger(savedIndex) && savedIndex >= 0 && savedIndex < steps.length
+  !props.standalone && Number.isInteger(savedIndex) && savedIndex >= 0 && savedIndex < steps.length
     ? savedIndex
     : 0,
 );
 const current = computed(() => steps[index.value]!);
+watch(index, () => {
+  if (props.standalone && guide.value?.parentElement) guide.value.parentElement.scrollTop = 0;
+}, { flush: 'post' });
 watch(
   [visible, index],
   () => {
-    emit("highlight", visible.value ? current.value.target : "");
-    saveSetting("mangafolio.library-guide.v1.step", String(index.value));
+    if (!props.embedded) emit("highlight", visible.value ? current.value.target : "");
+    if (!props.standalone) saveSetting("mangafolio.library-guide.v1.step", String(index.value));
   },
   { immediate: true },
 );
 function hide() {
+  if (props.standalone) { emit("complete"); return; }
   visible.value = false;
   saveSetting("mangafolio.library-guide.v1.hidden", "true");
 }
@@ -105,20 +78,21 @@ function reopen() {
 
 <template>
   <section
+    ref="guide"
     class="guide"
     :class="{ collapsed: !visible }"
     aria-labelledby="guide-title"
   >
     <div class="guide-header">
-      <h2 id="guide-title">新功能教學</h2>
-      <button v-if="visible" @click="hide">收合教學</button>
-      <button v-else @click="reopen">開始教學 →</button>
+      <h2 id="guide-title">{{ standalone ? '從加入作品到日常使用' : '使用教學' }}</h2>
+      <button v-if="visible && !standalone" @click="hide">收合教學</button>
+      <button v-else-if="!visible" @click="reopen">開始教學 →</button>
     </div>
     <template v-if="visible">
-      <nav class="steps" aria-label="教學步驟">
+      <nav class="steps" aria-label="教學主題">
         <button
           v-for="(step, position) in steps"
-          :key="step.target"
+          :key="step.title"
           :aria-current="position === index ? 'step' : undefined"
           :class="{ selected: position === index }"
           @click="index = position"
@@ -128,11 +102,18 @@ function reopen() {
       </nav>
       <div class="guide-content" aria-live="polite" aria-atomic="true">
         <span class="count"
-          >第 {{ index + 1 }} 步／共 {{ steps.length }} 步 ·
-          重點框線標示對應區域</span
+          >主題 {{ index + 1 }}／共 {{ steps.length }} 個 ·
+          {{ standalone ? '可選主題，也可依序閱讀；關閉後回到書庫操作' : embedded ? '關閉設定後，依下方說明操作書庫' : '重點框線標示對應區域' }}</span
         >
         <h3>{{ current.title }}</h3>
-        <p>{{ current.text }}</p>
+        <section v-for="task in current.tasks" :key="task.title" class="task">
+          <h4>{{ task.title }}</h4>
+          <ol class="instructions"><li v-for="instruction in task.instructions" :key="instruction">{{ instruction }}</li></ol>
+          <figure v-if="task.image">
+            <img :src="task.image" :alt="task.caption" loading="lazy" />
+            <figcaption>{{ task.caption }}（示範資料；介面配色可能不同）</figcaption>
+          </figure>
+        </section>
         <p class="check">確認效果：{{ current.check }}</p>
       </div>
       <div class="guide-actions">
@@ -205,6 +186,13 @@ p {
   color: var(--text);
   line-height: 1.8;
 }
+h4 { margin: 16px 0 8px; font-size: 14px; }
+.instructions { padding-left: 26px; margin: 0; font-size: 14px; line-height: 1.8; }
+.instructions li { padding: 4px 0 4px 4px; }
+.instructions li::marker { color: var(--accent-soft); font-weight: 700; }
+figure { margin: 12px 0 20px; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+figcaption { margin-top: 6px; font-size: 12px; color: var(--text-dim); line-height: 1.6; }
 .check {
   margin-top: 8px;
   color: var(--accent-soft);
@@ -230,6 +218,7 @@ p {
     flex: 1 1 150px;
     text-align: left;
   }
+  .steps { max-height: 140px; overflow-y: auto; }
 }
 .guide.collapsed {
   padding: 8px 12px;

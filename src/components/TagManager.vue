@@ -4,6 +4,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { createTag, renameTag, deleteTag } from "../api/library";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
+defineProps<{ expanded?: boolean }>();
 const library = useLibraryStore(),
   reader = useReaderStore();
 const name = ref(""),
@@ -48,7 +49,7 @@ async function run(kind: "create" | "rename" | "delete") {
 }
 </script>
 <template>
-  <details class="tag-manager">
+  <details class="tag-manager" :open="expanded">
     <summary>管理標籤</summary>
     <div class="fields">
       <label

@@ -4,6 +4,8 @@ import { editBook, type LibraryBook } from "../api/library";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 import { displayPath } from "../lib/library";
+import { pickCover, replaceCover } from "../api/media";
+import BookCover from "./BookCover.vue";
 const props = defineProps<{ book: LibraryBook }>();
 const emit = defineEmits<{ close: [] }>();
 const library = useLibraryStore(),
@@ -26,6 +28,18 @@ const busy = computed(
     library.favoritePending.size > 0,
 );
 onMounted(() => dialog.value?.showModal());
+async function cover(reset = false) {
+  if (busy.value) return;
+  library.managing = true; error.value = "";
+  try {
+    const path = reset ? null : await pickCover();
+    if (!reset && !path) return;
+    await replaceCover(props.book.id, path);
+    await library.refresh();
+    library.notifySuccess(reset ? "已恢復自動封面。" : "封面已替換並保存。");
+  } catch (e) { error.value = String(e); }
+  finally { library.managing = false; }
+}
 async function save() {
   if (busy.value) return;
   library.managing = true;
@@ -51,10 +65,14 @@ async function save() {
     @cancel="busy ? $event.preventDefault() : emit('close')"
   >
     <form @submit.prevent="save">
-      <h2 id="edit-title">編輯書籍資訊</h2>
+      <h2 id="edit-title">{{ book.format === 'video' ? '編輯影片資訊' : '編輯書籍資訊' }}</h2>
       <p class="source">
         原始來源名稱：{{ book.sourceTitle }}<br />{{ displayPath(book.path) }}
       </p>
+      <section class="cover-editor" aria-label="封面設定">
+        <BookCover :id="book.id" :available="book.available" :title="book.title" :revision="library.revision" />
+        <div><button type="button" :disabled="busy" @click="cover()">更換封面</button><button type="button" :disabled="busy" @click="cover(true)">恢復自動封面</button><p>封面變更立即保存，並隨書庫備份還原。圖片最多16 MiB；原始作品檔案不變。</p></div>
+      </section>
       <label
         >自訂書名<input
           v-model="details.customTitle"
@@ -126,4 +144,7 @@ p {
   gap: 8px;
   margin-top: 20px;
 }
+.cover-editor { display: flex; gap: 16px; margin: 16px 0; align-items: center; }
+.cover-editor :deep(.book-cover) { width: 100px; flex: 0 0 100px; }
+.cover-editor button { margin: 4px; }
 </style>

@@ -12,6 +12,8 @@ try {
     `${directory}/ipc.mjs`,
     `export let handler; export const configure = fn => handler = fn;
     export const setFavorite = (...args) => handler(...args);
+    export let videoHandler; export const configureVideo = fn => videoHandler=fn;
+    export const openVideo = (...args) => videoHandler(...args);
     export let listHandler; export const configureList = fn => listHandler=fn;
     export const listLibrary = async () => listHandler ? listHandler() : []; export let importHandler; export const configureImport = fn => importHandler=fn; export const importBookResult = (...args) => importHandler(...args); export const listTags = async () => [];
     export let loadHandler,saveHandler; export const configureLoad=fn=>loadHandler=fn; export const configureSave=fn=>saveHandler=fn; export const saveProgress = async (...args) => saveHandler?.(...args); export const openPath = async () => {};
@@ -32,6 +34,7 @@ try {
     js = js
       .replaceAll('"../api/library"', '"./ipc.mjs"')
       .replaceAll('"../api/backend"', '"./ipc.mjs"')
+      .replaceAll('"../api/media"', '"./ipc.mjs"')
       .replaceAll('"./reader"', '"./reader.mjs"')
       .replaceAll('"./library"', '"./library.mjs"')
       .replaceAll('"../lib/library"', '"./helpers.mjs"')
@@ -64,7 +67,7 @@ try {
   const { useReaderStore } = await import(
     pathToFileURL(`${directory}/reader.mjs`)
   );
-  const { configure, configureImport, configureLoad, configureSave, configureList, configureRender } = await import(
+  const { configure, configureImport, configureLoad, configureSave, configureList, configureRender, configureVideo } = await import(
     pathToFileURL(`${directory}/ipc.mjs`)
   );
   function setup() {
@@ -227,6 +230,28 @@ try {
     await library.add(["during-management"]);
     assert.deepEqual(calls, ["first"]);
     assert.equal(library.importing, false);
+  });
+  test("media tabs retain independent filters and videos open externally without replacing the reader", async () => {
+    const { library, reader } = setup();
+    const movie = { id: 3, title: "影片", sourceTitle: "影片", format: "video", tags: [], series: "", volume: "", notes: "", favorite: true, lastReadAt: null, available: true, readingStatus: "unread" };
+    library.books = [movie]; library.query = "漫畫"; library.statusFilter = "read";
+    library.setMediaFilter("video"); assert.equal(library.query, ""); assert.equal(library.visibleBooks.length, 1);
+    library.query = "影片"; library.tagFilter = 7;
+    library.setMediaFilter("all"); assert.equal(library.query,"漫畫"); assert.equal(library.statusFilter,"read");
+    library.setMediaFilter("video"); assert.equal(library.query,"影片"); assert.equal(library.tagFilter,7);
+    assert.equal(library.continueBook,undefined);
+    let calls=[]; configureVideo(async id => calls.push(id)); configureList(()=>[{...movie,lastReadAt:321}]);
+    reader.bookId=9; library.screen="library";
+    const coverRevision = library.revision;
+    assert.equal(await library.openMedia(3),true); assert.deepEqual(calls,[3]);
+    assert.equal(reader.bookId,9); assert.equal(library.screen,"library");
+    assert.equal(library.revision,coverRevision,"successful external opening keeps mounted covers");
+    assert.equal(library.books[0].lastReadAt,321,"recent opening still comes from refreshed backend metadata");
+    configureVideo(async()=>{throw Error("無法開啟影片");});
+    configureList(()=>[{...movie,available:false}]);
+    assert.equal(await library.openMedia(3),false); assert.match(library.error,/無法開啟影片/);
+    assert.equal(library.books[0].available,false); assert.equal(reader.bookId,9);
+    assert.equal(library.revision,coverRevision+1,"failed opening still refreshes source and cover state");
   });
   test("reader final spreads retain the start index in progress snapshots", () => {
     for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {

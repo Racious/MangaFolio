@@ -111,7 +111,7 @@ impl Library {
                     added: 0,
                     skipped: 0,
                     conflicts: usize::from(error.contains("重複")),
-                    unsupported: usize::from(version.is_some_and(|v| v > 3)),
+                    unsupported: usize::from(version.is_some_and(|v| v > 4)),
                     issues: vec![error],
                     can_restore: false,
                     version,
@@ -755,6 +755,8 @@ mod directory_tests {
                 ALTER TABLE backup_settings DROP COLUMN custom_directory;
                 ALTER TABLE backup_settings DROP COLUMN last_directory;
                 ALTER TABLE backup_settings DROP COLUMN directory_warning;
+                DROP TABLE custom_covers;
+                DROP TABLE library_roots;
                 PRAGMA user_version=3;",
             )
             .unwrap();
@@ -778,7 +780,7 @@ mod directory_tests {
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            4
+            5
         );
         assert_eq!(
             conn.query_row("SELECT COUNT(*) FROM automatic_backups", [], |r| r

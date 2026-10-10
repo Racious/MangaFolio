@@ -30,7 +30,7 @@ export interface LibraryBook extends BookDetails {
   readingStatus: ReadingStatus;
   statusManual: boolean;
   tags: Tag[];
-  format: "folder" | "cbz";
+  format: "folder" | "cbz" | "video";
   pageCount: number;
   favorite: boolean;
   lastIndex: number;

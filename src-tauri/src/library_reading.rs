@@ -89,6 +89,9 @@ pub(super) fn validate_backup_bookmarks(backup: &LibraryBackup) -> Result<(), St
     let mut ids = std::collections::HashSet::new();
     for mark in &backup.bookmarks {
         mark.validate()?;
+        if backup.books.iter().any(|b| b.id == mark.book_id && b.format == "video") {
+            return Err("影片不可包含漫畫書籤。".into());
+        }
         if mark.id <= 0 || !ids.insert(mark.id) || book_ids.get(&mark.book_id) != Some(&1) {
             return Err("備份書籤關聯無效或重複。".into());
         }

@@ -1,135 +1,99 @@
-# MangaFolio · 漫畫閱讀器
+# MangaFolio
 
-一款跨平台、高效能、忠於傳統閱讀體驗的本地漫畫／圖集閱讀器。對標 MangaMeeyaCE。
+**把漫畫、圖集與影片，整理成自己的本機收藏。**
 
-技術棧：**Tauri 2 + Rust 後端 + Vue 3 (TypeScript) 前端**。
+MangaFolio 是一款 Windows 桌面漫畫閱讀器與影音收藏工具。從封面找到作品、接著上次的頁面閱讀，用系列、標籤與收藏整理書庫；影片則交給您熟悉的系統預設播放器。
 
-文件入口：[文件索引](docs/README.md) · [新功能教學](docs/library-guide.md) · [開發交接](docs/handoff.md) · [驗證紀錄](docs/validation.md) · [工作日誌](docs/work-log.md)。
+[下載 Windows 版本](https://github.com/Racious/MangaFolio/releases/latest) · [使用教學](#三步開始使用) · [更新紀錄](CHANGELOG.md) · [開發文件](docs/README.md)
 
-本地獨立審查請使用 [審查作業交辦單](docs/review-assignment.md)，內含可直接交給 Claude／Codex 的指令。
+![MangaFolio 收藏工作台：漫畫、圖集與影片共用書庫](docs/images/showcase/workbench.jpg)
 
----
+> 畫面使用示範作品。本 README 展示 v0.3.0 的影音共管、六款介面、來源目錄按鈕與步驟教學；下載版功能與發行狀態請以對應 Release 的更新說明為準。
+
+## 為自己的收藏而做
+
+| 功能 | 使用方式 |
+| --- | --- |
+| 漫畫閱讀 | 圖片資料夾、ZIP／CBZ；單頁與雙頁、左開與右開、五種縮放模式、鍵盤翻頁 |
+| 影音共管 | 漫畫／圖集與影片分類切換；影片由系統預設播放器開啟 |
+| 封面書庫 | 收藏、搜尋、最近開啟、漫畫自動續讀；支援網格、詳細與緊湊列表 |
+| 系列與標籤 | 系列／集數整理、類別篩選、批次標籤與閱讀／觀看狀態管理 |
+| 加入作品 | 多選檔案與資料夾、主目錄遞迴掃描；先預覽，再選要匯入的作品 |
+| 自訂資訊 | 自訂書名、系列、集數、備註與人工封面；保留原始來源名稱 |
+| 書籤與備份 | 漫畫頁面書籤／筆記、書庫備份與預覽還原、本機自動安全備份 |
+| 找到原檔 | 從作品資訊的來源旁開啟資料夾，或在檔案總管中選取原始檔案 |
+
+**本機使用，無需帳號。** 加入作品時，媒體檔案留在原位；「移除所選」只移除書庫紀錄與該作品的相關資料，不會刪除原始漫畫或影片。
+
+## 選擇喜歡的介面
+
+六款介面可在「設定 → 外觀與閱讀」切換，版型與配色分開調整；明暗、密度、封面尺寸，以及背景、面板、重點色都能自訂。
+
+- **收藏工作台**：完整側欄與作品網格，適合分類整理。
+- **封面藝廊**：頂部導覽與簡潔續讀區，讓封面成為主角。
+- **資訊書架**：窄導覽與按需展開的右側資訊，方便查看作品資料。
+- **靜謐書架、目錄工作台、夜讀書房**：保留原有三款，依喜好選用。
+
+<details>
+<summary>查看封面藝廊與資訊書架</summary>
+
+### 封面藝廊
+
+![封面藝廊：頂部導覽、續讀與作品封面](docs/images/showcase/gallery.jpg)
+
+### 資訊書架
+
+![資訊書架：右側作品資訊欄與窄版導覽](docs/images/showcase/studio.jpg)
+
+</details>
 
 ## 下載
 
-至 [Releases](https://github.com/Racious/MangaFolio/releases/latest) 取得最新版本：
+前往 [GitHub Releases](https://github.com/Racious/MangaFolio/releases/latest) 選擇 Windows 版本。
 
-| 類型 | 說明 |
+| 版本 | 適合情境 |
 | --- | --- |
-| 安裝版（MSI，推薦） | Windows Installer，自動整合捷徑與解除安裝 |
-| 安裝版（NSIS） | 輕量安裝程式 |
-| 攜帶版（免安裝） | 單一 `.exe`，無需安裝，直接執行 |
+| MSI 安裝版 | 一般安裝，整合捷徑與解除安裝 |
+| NSIS 安裝版 | 使用安裝精靈 |
+| Portable `.exe` | 免安裝，直接執行；書庫資料仍使用本機應用資料目錄 |
 
----
+## 三步開始使用
 
-## 開發進度
+1. **加入作品**：點「加入作品」，選漫畫／影片檔案、圖片資料夾，或要遞迴掃描的主目錄；出現預覽時，確認勾選項目再匯入。
+2. **開啟作品**：點漫畫封面閱讀，用方向鍵翻頁；點影片封面會使用預設播放器。漫畫返回書庫後，下次可接著原頁面閱讀。
+3. **整理收藏**：點星號收藏，或用「管理作品」批次指定系列、標籤及狀態。需要提示時，點書庫上方「教學」查看 12 個主題的步驟與截圖。
 
-| 階段 | 內容 | 狀態 |
-| --- | --- | --- |
-| **P1 — 基礎** | 開啟資料夾／ZIP／CBZ、自然排序、單頁顯示、左右翻頁 | ✅ 完成 |
-| **P2 — 閱讀核心** | 雙頁、左／右開、縮放模式、Lanczos3 縮放管線 | ✅ 完成 |
-| P3 — 體驗 | 快捷鍵、預載快取、書庫、收藏、搜尋、續讀、教學引導 | 功能分支已實作；縮圖列待開發，尚待獨立審查與 Windows 驗收 |
-| P4 — 格式擴增 | RAR / CBR、7z | 規劃中 |
+**標籤怎麼加？** 先在「設定 → 類別與標籤」輸入名稱並建立，再回到「管理作品」勾選作品、選擇標籤，按「批次加入標籤」。
 
-### P1 已實作功能
+**資料夾後來多了作品？** 已加入的主目錄可從「設定 → 書庫來源」重新掃描。
 
-- 開啟**資料夾**、**ZIP / CBZ** 壓縮檔、或**單張圖片**（單張圖片會載入其所在資料夾並定位該圖）
-- 頁面清單**自然排序**（1, 2, …, 10，而非 1, 10, 2）
-- **單頁顯示**，圖片配合視窗（contain）
-- **左右翻頁**：方向鍵、空白鍵、PageUp／Down、Home／End、點擊左右半邊、工具列按鈕
-- **左開／右開**切換（影響翻頁與點擊方向；右開為日漫預設）
+**影片進度怎麼記？** 外部播放器不會回傳播放進度，觀看狀態請在管理作品中手動標記。
 
-### P2 已實作功能
+## 格式與資料
 
-- **後端影像管線**：解碼 → Lanczos3 縮放 → PNG 編碼，前端以 1:1 原生像素呈現（不二次縮放）
-- **五種縮放模式**：配合視窗／配合寬度／配合高度／原始尺寸／固定倍率（10%–800%）
-- **雙頁顯示**與跨頁配對（依左右開決定左右位置；偶數頁對齊步進）
-- 容器尺寸變動（縮放視窗）即時重算並重新請求後端縮放
-- 快速翻頁以 render token 防止舊請求覆蓋新畫面
+- **漫畫與圖集**：圖片資料夾、ZIP／CBZ；圖片支援 JPEG（JPG／JFIF）、PNG、GIF、WebP、BMP。
+- **影片來源辨識**：MP4、MKV、AVI、MOV、WMV、WebM、M4V、MPG／MPEG、TS／M2TS。能否播放取決於系統預設播放器。
+- **影片封面**：優先使用同名圖片；單片資料夾可使用 `cover`／`poster`／`folder` 圖片，也可自行更換封面。
+- **本機資料**：Windows 書庫位於 `%APPDATA%\com.racious.mangafolio\library.sqlite3`，封面與備份也由本機管理；無需另裝資料庫。
+- **備份範圍**：從「設定 → 資料與備份」匯出，包含書庫資訊、收藏、進度、偏好、標籤、書籤／筆記與人工封面；不包含原始媒體、自動封面、外觀設定、本機主目錄及自動備份設定。原始檔案請另外保管。
 
-> 註：雙頁採「每頁配合半個視窗」策略，對尺寸一致的漫畫頁（常態）效果理想。
-> 傳輸格式目前統一 PNG（線稿無損銳利）；照片內容的 WebP/JPEG 啟發式留待後續優化。
+目前不支援 RAR／CBR、7z、OCR 或雲端同步。
 
----
+## 開發與文件
 
-## 書庫開發版
+以 **Tauri 2、Rust、Vue 3、TypeScript 與 SQLite** 建置。後端負責圖片解碼、縮放與快取，前端呈現閱讀與書庫介面。
 
-此分支新增本機書庫首頁、封面、書名搜尋、整本收藏、最近閱讀與自動續讀。
-
-首頁新增可收合的五步教學，標示對應操作區域，並可隨時重看。完整操作與畫面對照請見 [新功能教學](docs/library-guide.md)。
-
-- **加入書籍**：首頁可多選 ZIP／CBZ，或加入直接包含圖片的資料夾；原始檔案留在原位。重複加入同一來源會更新資料，不會清除收藏與進度。
-- **閱讀與收藏**：點封面開始閱讀，點星號收藏；「我的收藏」「最近閱讀」可搭配書名搜尋。搜尋支援大小寫與全形／半形正規化。
-- **自動續讀**：每本書保存頁面名稱、頁碼、方向、單雙頁、縮放及翻頁偏好。返回書庫、切書與正常關閉視窗前會補存；儲存失敗時顯示錯誤並保留閱讀視窗供重試。
-- **本機資料**：Rust 使用 bundled SQLite，不需另外安裝資料庫。`library.sqlite3` 與 `covers/` 位於 Tauri 的應用資料目錄（identifier 為 `com.racious.mangafolio`）。備份前先關閉程式；程式開啟時 SQLite 可能還有 WAL 資料。
-- **管理與備份**：勾選書籍可批次收藏／移除，單本可重新指定來源。支援 JSON 書庫備份與合併還原，既有來源保留不覆寫；備份不含漫畫本體。程式內匯出會先補存進度，不需要關閉程式；手動複製 SQLite 的備份仍需先關閉。
-- **目前範圍**：這是手動加入來源的本機書庫，尚未提供遞迴掃描漫畫根目錄、頁面書籤、OCR 或雲端同步。來源暫時不存在時會保留書籍資料、收藏與進度；重新接回原路徑或重新指定來源後可恢復使用。
-
-## 開發
+開發需要 Node.js（測試需支援 `--experimental-strip-types`）、Rust，以及 Windows C++ Build Tools。
 
 ```bash
 npm ci
-npm test              # 書名搜尋、篩選與排序
-npm run build         # TypeScript 與前端建置
+npm test
+npm run build
 cargo test --locked --manifest-path src-tauri/Cargo.toml
-npm run tauri dev      # 開發模式（前端 + Rust 熱重載）
-npm run tauri build    # 打包正式版
+npm run tauri dev
+npm run tauri build
 ```
 
-### 發版（自動 release）
+[文件索引](docs/README.md) · [操作說明](docs/library-guide.md) · [更新紀錄](CHANGELOG.md)
 
-1. 在 `CHANGELOG.md` 頂端新增 `## vX.Y.Z` 區段並寫好更新說明。
-2. 同步版本號：`npm run version:set -- X.Y.Z`（更新 package.json / tauri.conf.json / Cargo.toml）。
-3. 提交後打 tag 並推送：
-
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-
-4. GitHub Actions（`.github/workflows/release.yml`）自動建置並發佈 Release，附 MSI／NSIS 安裝檔、攜帶版 `.exe`，說明內容取自 `CHANGELOG.md`。
-
-### 環境需求
-
-| 工具 | 版本 |
-| --- | --- |
-| Rust toolchain | 1.95.0 |
-| Node.js | v22.x |
-| MS C++ Build Tools | 建置 Rust 時需要 |
-
----
-
-## 架構
-
-前後端透過 Tauri IPC 通訊。**核心原則：原圖絕不直送 WebView** —— 後端負責解碼與縮放（P2 起），前端只負責排版顯示。
-
-```
-src/                      # Vue 3 前端
-├─ components/
-│  ├─ ReaderView.vue      # 閱讀區（單／雙頁、3D 翻書特效、點擊／鍵盤導航）
-│  ├─ LibraryView.vue     # 書庫、搜尋、收藏與續讀入口
-│  ├─ LibraryGuide.vue    # 五步教學與操作區域提示
-│  ├─ LibraryManager.vue  # 批次管理、重新指定來源、備份／還原
-│  ├─ BookCard.vue        # 延遲封面、收藏與進度卡片
-│  ├─ Toolbar.vue         # 工具列（開檔、縮放、翻頁特效、單雙頁、方向、封面單獨）
-│  └─ PageScrubber.vue    # 底部頁碼進度條（可跳頁、顯示檔名）
-├─ stores/reader.ts       # Pinia 狀態（書、頁碼、方向、縮放、特效、配對）
-├─ stores/library.ts      # 書庫狀態、加入與收藏
-├─ api/backend.ts         # 封裝 Tauri invoke（含影像解碼）
-└─ App.vue                # 組裝
-
-src-tauri/                # Rust 後端
-└─ src/
-   ├─ lib.rs              # 應用進入點、指令註冊
-   ├─ library.rs          # SQLite 書庫、收藏、閱讀進度與封面
-   ├─ commands.rs         # IPC 指令（open_path / render_page）＋兩級快取＋預載
-   ├─ image_pipeline.rs   # 解碼 → Lanczos3(SIMD) 縮放 → PNG 編碼
-   ├─ cache.rs            # 解碼／算繪 LRU 快取
-   ├─ book.rs             # 書籍抽象（資料夾 / 壓縮檔）
-   ├─ archive/zip.rs      # ZIP / CBZ 讀取
-   └─ sorting.rs          # 自然排序
-```
-
----
-
-*由天城（AMAGI）整理*
+發版時，先更新 CHANGELOG 與版本號（`npm run version:set -- X.Y.Z`），再提交、建立並推送 `vX.Y.Z` tag；GitHub Actions 會建置 Windows 安裝檔與攜帶版。

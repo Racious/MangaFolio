@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BackupPanel from "./BackupPanel.vue";
 import { computed, ref } from "vue";
 import { ask, open } from "@tauri-apps/plugin-dialog";
 import {
@@ -11,6 +10,7 @@ import {
   removeBooks,
 } from "../api/library";
 import { pickFolder } from "../api/backend";
+import { videoExtensions } from "../api/media";
 import { useLibraryStore } from "../stores/library";
 import { useReaderStore } from "../stores/reader";
 
@@ -20,6 +20,8 @@ const library = useLibraryStore();
 const reader = useReaderStore();
 const tagId = ref<number | null>(null);
 const series = ref("");
+const hasVideo = computed(() => library.books.some(b => props.selectedIds.includes(b.id) && b.format === 'video'));
+const onlyVideo = computed(() => props.selectedIds.length === 1 && library.books.find(b => b.id === props.selectedIds[0])?.format === 'video');
 async function setSeries() { await run(async(ids) => { if (!ids.length) return; await assignSeries(ids, series.value); await library.refresh(); library.notifySuccess("系列歸屬已更新，書籍與來源保留。"); }); }
 async function status(status: "read" | "unread" | "auto") {
   await run(async (ids) => {
@@ -73,9 +75,10 @@ async function run(action: (ids: number[]) => Promise<void>) {
 async function removeSelected() {
   await run(async (ids) => {
     if (!ids.length) return;
+    const originalFiles = hasVideo.value ? '原始媒體檔案' : '原始漫畫檔案';
     if (
       !(await ask(
-        `將 ${ids.length} 本書移出書庫？\n這些項目的收藏、閱讀進度與偏好、系列／集數、標籤關聯、書籤／頁面筆記、自訂書名與備註會一併移除。原始漫畫檔案與共用標籤會保留。可先匯出備份。`,
+        `將 ${ids.length} 筆作品移出書庫？\n這些項目的收藏、閱讀進度與偏好、系列／集數、標籤關聯、書籤／頁面筆記、自訂書名與備註、人工封面會一併移除。${originalFiles}與共用標籤會保留。可先匯出備份。`,
         {
           title: "移除書庫項目",
           kind: "warning",
@@ -90,7 +93,7 @@ async function removeSelected() {
       reader.discardBook();
     emit("clear");
     await library.refresh();
-    library.notifySuccess(`已移除 ${ids.length} 本書，原始漫畫檔案已保留。`);
+    library.notifySuccess(`已移除 ${ids.length} 筆作品，${originalFiles}已保留。`);
   });
 }
 async function setSelectedFavorite(favorite: boolean) {
@@ -104,21 +107,21 @@ async function setSelectedFavorite(favorite: boolean) {
     library.notifySuccess(`已${favorite ? "收藏" : "取消收藏"} ${ids.length} 本書。`);
   });
 }
-async function relink(folder: boolean) {
+async function relink(folder: boolean, video = false) {
   await run(async (ids) => {
     if (ids.length !== 1) return;
     const path = folder
       ? await pickFolder()
       : ((await open({
           multiple: false,
-          filters: [{ name: "漫畫壓縮檔", extensions: ["zip", "cbz"] }],
+          filters: [{ name: video ? "影片" : "漫畫壓縮檔", extensions: video ? videoExtensions : ["zip", "cbz"] }],
         })) as string | null);
     if (!path) return;
     const title =
       library.books.find((book) => book.id === ids[0])?.title ?? "所選書籍";
     if (
       !(await ask(
-        `為「${title}」改用所選來源？\n請選同一本漫畫，收藏、閱讀設定與進度會保留；頁面改動時優先依檔名定位。`,
+        video ? `為「${title}」改用所選影片？收藏、資訊、人工封面與觀看狀態會保留。` : `為「${title}」改用所選來源？\n請選同一本漫畫，收藏、閱讀設定與進度會保留；頁面改動時優先依檔名定位。`,
         {
           title: "重新指定來源",
           kind: "warning",
@@ -136,7 +139,7 @@ async function relink(folder: boolean) {
     }
     emit("clear");
     await library.refresh();
-    library.notifySuccess("已更新來源，請從封面重新開啟閱讀。");
+    library.notifySuccess(video ? "已更新影片來源，請從封面重新開啟。" : "已更新來源，請從封面重新開啟閱讀。");
   });
 }
 </script>
@@ -147,8 +150,8 @@ async function relink(folder: boolean) {
     aria-labelledby="manager-title"
     :aria-busy="busy"
   >
-    <h2 id="manager-title">管理與備份</h2>
-    <p>點擊書卡切換選取。移除只影響書庫紀錄；重新指定來源請選同一本漫畫。</p>
+    <h2 id="manager-title">管理作品</h2>
+    <p>點擊卡片切換選取。移除只影響書庫紀錄；重新指定來源請選同一筆作品。</p>
     <div class="actions">
       <span aria-live="polite">已選 {{ selectedIds.length }} 本</span>
       <template v-if="hiddenCount">
@@ -177,6 +180,7 @@ async function relink(folder: boolean) {
         移除所選
       </button>
       <button
+        v-if="!onlyVideo"
         :disabled="busy || selectedIds.length !== 1"
         :title="relinkReason"
         :aria-describedby="relinkReason ? 'relink-reason' : undefined"
@@ -185,6 +189,7 @@ async function relink(folder: boolean) {
         重新指定 ZIP／CBZ
       </button>
       <button
+        v-if="!onlyVideo"
         :disabled="busy || selectedIds.length !== 1"
         :title="relinkReason"
         :aria-describedby="relinkReason ? 'relink-reason' : undefined"
@@ -192,6 +197,7 @@ async function relink(folder: boolean) {
       >
         重新指定圖片資料夾
       </button>
+      <button v-if="onlyVideo" :disabled="busy" @click="relink(false, true)">重新指定影片</button>
     </div>
     <p
       v-if="relinkReason"
@@ -205,14 +211,15 @@ async function relink(folder: boolean) {
     </div>
     <div class="actions">
       <button :disabled="busy || !selectedIds.length" @click="status('read')">
-        標記已讀
+        {{ hasVideo ? '標記已讀／已看' : '標記已讀' }}
       </button>
       <button :disabled="busy || !selectedIds.length" @click="status('unread')">
-        標記未讀
+        {{ hasVideo ? '標記未讀／未看' : '標記未讀' }}
       </button>
-      <button :disabled="busy || !selectedIds.length" @click="status('auto')">
+      <button :disabled="busy || !selectedIds.length || hasVideo" :title="hasVideo ? '外部播放器不回傳進度，影片請手動標記觀看狀態' : undefined" @click="status('auto')">
         依進度判定
       </button>
+      <p v-if="hasVideo">影片由預設播放器開啟，觀看狀態採手動標記。</p>
       <select v-model="tagId" aria-label="批次標籤" :disabled="busy">
         <option :value="null">選擇標籤</option>
         <option v-for="item in library.tags" :key="item.id" :value="item.id">
@@ -232,7 +239,6 @@ async function relink(folder: boolean) {
         批次移除標籤
       </button>
     </div>
-    <BackupPanel />
     <p v-if="library.managing" role="status">正在處理書庫，請稍候…</p>
   </section>
 </template>
