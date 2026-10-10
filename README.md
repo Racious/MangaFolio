@@ -8,7 +8,7 @@ MangaFolio 是一款 Windows 桌面漫畫閱讀器與影音收藏工具。從封
 
 ![MangaFolio 收藏工作台：漫畫、圖集與影片共用書庫](docs/images/showcase/workbench.jpg)
 
-> 畫面使用示範作品。本 README 展示 v0.3.0 的影音共管、六款介面、來源目錄按鈕與步驟教學；下載版功能與發行狀態請以對應 Release 的更新說明為準。
+> 畫面使用示範作品，展示影音共管、六款介面、來源目錄按鈕與步驟教學。目前最新發行版為 [v0.3.1](https://github.com/Racious/MangaFolio/releases/tag/v0.3.1)，另包含薄荷綠應用圖示、透明標題列與小圖示清晰度修正；完整更新內容請見 Release 說明。
 
 ## 為自己的收藏而做
 
