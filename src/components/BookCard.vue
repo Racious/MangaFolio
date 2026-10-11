@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PhStar, PhPencilSimple, PhPlay, PhBookOpen } from "@phosphor-icons/vue";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { loadCover } from "../api/covers";
 import { progressPercent, statusLabels, videoStatusLabels, displayPath } from "../lib/library";
 import type { LibraryBook } from "../api/library";
@@ -23,7 +23,10 @@ const emit = defineEmits<{
 const element = ref<HTMLElement | null>(null);
 const titleElement = ref<HTMLElement | null>(null);
 const titleMeasure = ref<HTMLElement | null>(null);
+const titleWrapMeasure = ref<HTMLElement | null>(null);
+const coverFrame = ref<HTMLElement | null>(null);
 const longTitle = ref(false);
+const expandedTitleStyle = ref<Record<string, string>>({});
 let titleObserver: ResizeObserver | null = null;
 const cover = ref<string | null>(null);
 const coverFailed = ref(false);
@@ -39,16 +42,49 @@ function activateCover() {
   else if (!props.opening && props.book.available) emit("open", props.book.id);
 }
 onMounted(() => {
+  let measurementKey = "";
   const measureTitle = () => {
-    if (!titleElement.value || !titleMeasure.value) return;
+    if (!titleElement.value || !titleMeasure.value || !titleWrapMeasure.value || !coverFrame.value) return;
     const style = getComputedStyle(titleElement.value);
     const available = titleElement.value.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     longTitle.value = titleMeasure.value.getBoundingClientRect().width > available + 1;
+    const baseFont = parseFloat(style.getPropertyValue("--title-base-font")) || parseFloat(style.fontSize);
+    const lineRatio = parseFloat(style.getPropertyValue("--title-line-ratio")) || 1.5;
+    const frameHeight = coverFrame.value.getBoundingClientRect().height;
+    const key = JSON.stringify([props.book.title, available, baseFont, lineRatio, frameHeight]);
+    if (key === measurementKey || available <= 0 || frameHeight <= 0) return;
+    measurementKey = key;
+    if (!longTitle.value) {
+      expandedTitleStyle.value = {};
+      return;
+    }
+    const budget = Math.max(baseFont * lineRatio, frameHeight * 0.45);
+    const probe = titleWrapMeasure.value;
+    probe.style.width = `${available}px`;
+    let font = baseFont;
+    let rows = 1;
+    // Try readable sizes first; exceptionally long names retain a full native tooltip.
+    for (const scale of [1, 0.95, 0.9, 0.85]) {
+      font = baseFont * scale;
+      probe.style.fontSize = `${font}px`;
+      probe.style.lineHeight = `${font * lineRatio}px`;
+      rows = Math.max(1, Math.round(probe.getBoundingClientRect().height / (font * lineRatio)));
+      if (rows * font * lineRatio <= budget) break;
+    }
+    rows = Math.min(rows, Math.max(1, Math.floor(budget / (font * lineRatio))));
+    const height = Math.max(baseFont * lineRatio, rows * font * lineRatio);
+    expandedTitleStyle.value = {
+      "--title-expanded-font": `${font}px`,
+      "--title-expanded-extra": `${height - baseFont * lineRatio}px`,
+      "--title-expanded-rows": `${rows}`,
+    };
   };
   if (typeof ResizeObserver !== "undefined") {
     titleObserver = new ResizeObserver(measureTitle);
     if (titleElement.value) titleObserver.observe(titleElement.value);
     if (titleMeasure.value) titleObserver.observe(titleMeasure.value);
+    if (coverFrame.value) titleObserver.observe(coverFrame.value);
+    watch(() => props.book.title, measureTitle, { flush: "post" });
     measureTitle();
   }
   observer = new IntersectionObserver(
@@ -83,6 +119,8 @@ onUnmounted(() => {
   <article
     ref="element"
     class="book-card"
+    :title="book.title"
+    :style="expandedTitleStyle"
     @click="activateCard"
     :class="[
       view ?? 'grid',
@@ -106,7 +144,7 @@ onUnmounted(() => {
       />
       選取
     </label>
-    <div class="cover-frame">
+    <div ref="coverFrame" class="cover-frame">
       <button
         class="cover"
         :disabled="opening || (!selectable && !book.available)"
@@ -131,7 +169,7 @@ onUnmounted(() => {
     </button>
     </div>
     <div class="details">
-      <h2 ref="titleElement" :title="book.title"><span>{{ book.title }}</span><span ref="titleMeasure" class="title-measure" aria-hidden="true">{{ book.title }}</span></h2>
+      <h2 ref="titleElement" :title="book.title"><span>{{ book.title }}</span><span ref="titleMeasure" class="title-measure" aria-hidden="true">{{ book.title }}</span><span ref="titleWrapMeasure" class="title-wrap-measure" aria-hidden="true">{{ book.title }}</span></h2>
       <button
         class="favorite"
         :class="{ selected: book.favorite }"
@@ -516,6 +554,8 @@ p {
   background: var(--panel);
 }
 .grid {
+  --title-base-font: 20px;
+  --title-line-ratio: 1.5;
   align-self: start;
   background: var(--grid-surface);
   border-color: var(--grid-outline);
@@ -556,14 +596,20 @@ p {
 }
 .grid .details {
   margin-top: calc(-1 * var(--title-extra));
-  transition: margin-top .2s ease;
+  transition: margin-top .2s ease, min-height .2s ease;
 }
-.title-measure {
+.title-measure, .title-wrap-measure {
   position: absolute;
   visibility: hidden;
   white-space: nowrap;
   width: max-content;
   pointer-events: none;
+  font-size: var(--title-base-font, inherit);
+  line-height: var(--title-line-ratio, inherit);
+}
+.title-wrap-measure {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 h2 {
   position: relative;
@@ -574,30 +620,33 @@ h2 {
 }
 .grid h2 > span:first-child {
   display: block;
+  line-height: var(--title-line-ratio);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .grid.long-title:focus-within {
-  --title-extra: var(--title-line);
+  --title-extra: var(--title-expanded-extra, var(--title-line));
   --cover-zoom: 1.025;
 }
 .grid.long-title:focus-within h2 > span:first-child {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: var(--title-expanded-rows, 2);
+  font-size: var(--title-expanded-font, var(--title-base-font));
   white-space: normal;
   overflow-wrap: anywhere;
 }
 @media (hover: hover) and (pointer: fine) {
   .grid.long-title:hover {
-    --title-extra: var(--title-line);
+    --title-extra: var(--title-expanded-extra, var(--title-line));
     --cover-zoom: 1.025;
   }
   .grid.long-title:hover h2 > span:first-child {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: var(--title-expanded-rows, 2);
+    font-size: var(--title-expanded-font, var(--title-base-font));
     white-space: normal;
     overflow-wrap: anywhere;
   }
