@@ -21,6 +21,10 @@ const emit = defineEmits<{
   edit: [book: LibraryBook];
 }>();
 const element = ref<HTMLElement | null>(null);
+const titleElement = ref<HTMLElement | null>(null);
+const titleMeasure = ref<HTMLElement | null>(null);
+const longTitle = ref(false);
+let titleObserver: ResizeObserver | null = null;
 const cover = ref<string | null>(null);
 const coverFailed = ref(false);
 let observer: IntersectionObserver | null = null;
@@ -35,6 +39,18 @@ function activateCover() {
   else if (!props.opening && props.book.available) emit("open", props.book.id);
 }
 onMounted(() => {
+  const measureTitle = () => {
+    if (!titleElement.value || !titleMeasure.value) return;
+    const style = getComputedStyle(titleElement.value);
+    const available = titleElement.value.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    longTitle.value = titleMeasure.value.getBoundingClientRect().width > available + 1;
+  };
+  if (typeof ResizeObserver !== "undefined") {
+    titleObserver = new ResizeObserver(measureTitle);
+    if (titleElement.value) titleObserver.observe(titleElement.value);
+    if (titleMeasure.value) titleObserver.observe(titleMeasure.value);
+    measureTitle();
+  }
   observer = new IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
@@ -57,6 +73,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   cancelled = true;
+  titleObserver?.disconnect();
   observer?.disconnect();
   if (cover.value) URL.revokeObjectURL(cover.value);
 });
@@ -69,7 +86,7 @@ onUnmounted(() => {
     @click="activateCard"
     :class="[
       view ?? 'grid',
-      { offline: !book.available, picked: selectable && selected, focused },
+      { offline: !book.available, picked: selectable && selected, focused, 'long-title': longTitle },
     ]"
   >
     <button
@@ -89,30 +106,32 @@ onUnmounted(() => {
       />
       選取
     </label>
-    <button
-      class="cover"
-      :disabled="opening || (!selectable && !book.available)"
-      :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : book.format === 'video' ? `使用預設播放器開啟：${book.title}` : `${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
-      :aria-pressed="selectable ? !!selected : undefined"
-      @click.stop="activateCover"
-    >
-      <img v-if="cover" :src="cover" alt="" />
-      <div v-else class="placeholder">
-        <small>{{
-          !book.available
-            ? "來源離線"
-            : coverFailed
-              ? "尚無可用封面"
-              : "封面載入中"
-        }}</small>
-      </div>
+    <div class="cover-frame">
+      <button
+        class="cover"
+        :disabled="opening || (!selectable && !book.available)"
+        :aria-label="selectable ? `${selected ? '取消選取' : '選取'}：${book.title}` : book.format === 'video' ? `使用預設播放器開啟：${book.title}` : `${book.lastReadAt ? '繼續閱讀' : '開始閱讀'}：${book.title}`"
+        :aria-pressed="selectable ? !!selected : undefined"
+        @click.stop="activateCover"
+      >
+        <img v-if="cover" :src="cover" alt="" />
+        <div v-else class="placeholder">
+          <small>{{
+            !book.available
+              ? "來源離線"
+              : coverFailed
+                ? "尚無可用封面"
+                : "封面載入中"
+          }}</small>
+        </div>
       <span class="format" :class="{ video: book.format === 'video' }">{{
         book.format === "video" ? "影片" : book.format === "folder" ? "資料夾" : "CBZ / ZIP"
       }}</span>
       <span v-if="!selectable && book.available" class="cover-action"><component :is="book.format === 'video' ? PhPlay : PhBookOpen" :size="19" aria-hidden="true" />{{ book.format === 'video' ? '預設播放器' : book.lastReadAt ? '繼續閱讀' : '開始閱讀' }}</span>
     </button>
+    </div>
     <div class="details">
-      <h2 :title="book.title">{{ book.title }}</h2>
+      <h2 ref="titleElement" :title="book.title"><span>{{ book.title }}</span><span ref="titleMeasure" class="title-measure" aria-hidden="true">{{ book.title }}</span></h2>
       <button
         class="favorite"
         :class="{ selected: book.favorite }"
@@ -507,6 +526,86 @@ p {
   border-radius: calc(var(--radius) - 2px);
   overflow: hidden;
   box-shadow: var(--grid-cover-shadow);
+}
+.cover-frame {
+  display: contents;
+}
+.grid {
+  --title-line: 30px;
+  --title-extra: 0px;
+  --cover-zoom: 1;
+}
+.grid .cover-frame {
+  display: block;
+  position: relative;
+  aspect-ratio: 3 / 4;
+}
+.grid .cover {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(100% - var(--title-extra));
+  aspect-ratio: auto;
+  transition: height .2s ease, box-shadow .2s ease;
+}
+.grid .cover img {
+  position: absolute;
+  top: 50%;
+  height: calc(100% + var(--title-extra));
+  transform: translateY(-50%) scale(var(--cover-zoom));
+  transition: transform .2s ease;
+}
+.grid .details {
+  margin-top: calc(-1 * var(--title-extra));
+  transition: margin-top .2s ease;
+}
+.title-measure {
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  width: max-content;
+  pointer-events: none;
+}
+h2 {
+  position: relative;
+}
+.grid h2 {
+  height: calc(var(--title-line) + var(--title-extra));
+  transition: height .2s ease;
+}
+.grid h2 > span:first-child {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grid.long-title:focus-within {
+  --title-extra: var(--title-line);
+  --cover-zoom: 1.025;
+}
+.grid.long-title:focus-within h2 > span:first-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (hover: hover) and (pointer: fine) {
+  .grid.long-title:hover {
+    --title-extra: var(--title-line);
+    --cover-zoom: 1.025;
+  }
+  .grid.long-title:hover h2 > span:first-child {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid .cover, .grid .cover img, .grid .details, .grid h2 {
+    transition: none;
+  }
 }
 .grid .details {
   padding: var(--grid-details-space);
